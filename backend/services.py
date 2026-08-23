@@ -1,0 +1,100 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Protocol
+
+from errors import ApiError
+from schemas import (
+    CategoryCode,
+    CategoryPrediction,
+    CopyCandidate,
+    ListingMetadata,
+    MarketEvidence,
+    ProcessedImage,
+    ServiceReadiness,
+)
+
+
+class ListingGenerator(Protocol):
+    version: str
+
+    def readiness(self) -> ServiceReadiness: ...
+
+    async def generate(
+        self, image: ProcessedImage, metadata: ListingMetadata
+    ) -> CopyCandidate: ...
+
+
+class CategoryClassifier(Protocol):
+    version: str
+
+    def readiness(self) -> ServiceReadiness: ...
+
+    async def classify(
+        self, image: ProcessedImage, metadata: ListingMetadata
+    ) -> CategoryPrediction: ...
+
+
+class MarketPricingService(Protocol):
+    version: str
+    data_version: str
+
+    def readiness(self) -> ServiceReadiness: ...
+
+    async def find_comparables(
+        self, metadata: ListingMetadata, category: CategoryCode
+    ) -> MarketEvidence | None: ...
+
+
+@dataclass(frozen=True)
+class ListingServices:
+    generator: ListingGenerator
+    classifier: CategoryClassifier
+    market: MarketPricingService
+
+    def readiness(self) -> dict[str, ServiceReadiness]:
+        return {
+            "generator": self.generator.readiness(),
+            "classifier": self.classifier.readiness(),
+            "market": self.market.readiness(),
+        }
+
+
+class UnavailableCategoryClassifier:
+    version = "unavailable"
+
+    def readiness(self) -> ServiceReadiness:
+        return ServiceReadiness(
+            ready=False,
+            reason="canonical category classifier is not configured",
+        )
+
+    async def classify(
+        self, image: ProcessedImage, metadata: ListingMetadata
+    ) -> CategoryPrediction:
+        raise _unavailable_error("category classifier")
+
+
+class UnavailableMarketPricingService:
+    version = "unavailable"
+    data_version = "unavailable"
+
+    def readiness(self) -> ServiceReadiness:
+        return ServiceReadiness(
+            ready=False,
+            reason="licensed versioned market data is not configured",
+        )
+
+    async def find_comparables(
+        self, metadata: ListingMetadata, category: CategoryCode
+    ) -> MarketEvidence | None:
+        raise _unavailable_error("market pricing service")
+
+
+def _unavailable_error(service: str) -> ApiError:
+    return ApiError(
+        status_code=503,
+        code="SERVICE_NOT_READY",
+        message=f"{service} belum siap.",
+        retryable=True,
+    )

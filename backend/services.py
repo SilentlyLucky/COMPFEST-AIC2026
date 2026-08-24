@@ -18,6 +18,8 @@ from schemas import (
 class ListingGenerator(Protocol):
     version: str
 
+    async def warmup(self) -> None: ...
+
     def readiness(self) -> ServiceReadiness: ...
 
     async def generate(
@@ -27,6 +29,8 @@ class ListingGenerator(Protocol):
 
 class CategoryClassifier(Protocol):
     version: str
+
+    async def warmup(self) -> None: ...
 
     def readiness(self) -> ServiceReadiness: ...
 
@@ -38,6 +42,8 @@ class CategoryClassifier(Protocol):
 class MarketPricingService(Protocol):
     version: str
     data_version: str
+
+    async def warmup(self) -> None: ...
 
     def readiness(self) -> ServiceReadiness: ...
 
@@ -52,6 +58,14 @@ class ListingServices:
     classifier: CategoryClassifier
     market: MarketPricingService
 
+    async def warmup(self) -> None:
+        unique_services = {
+            id(service): service
+            for service in (self.generator, self.classifier, self.market)
+        }
+        for service in unique_services.values():
+            await service.warmup()
+
     def readiness(self) -> dict[str, ServiceReadiness]:
         return {
             "generator": self.generator.readiness(),
@@ -62,6 +76,9 @@ class ListingServices:
 
 class UnavailableCategoryClassifier:
     version = "unavailable"
+
+    async def warmup(self) -> None:
+        raise _unavailable_error("category classifier")
 
     def readiness(self) -> ServiceReadiness:
         return ServiceReadiness(
@@ -78,6 +95,9 @@ class UnavailableCategoryClassifier:
 class UnavailableMarketPricingService:
     version = "unavailable"
     data_version = "unavailable"
+
+    async def warmup(self) -> None:
+        raise _unavailable_error("market pricing service")
 
     def readiness(self) -> ServiceReadiness:
         return ServiceReadiness(

@@ -2,6 +2,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
+
 from confidence import build_confidence, score_generation
 from guardrails import ground_copy
 from pricing import PricingInputError, align_market_price, calculate_viable_floor

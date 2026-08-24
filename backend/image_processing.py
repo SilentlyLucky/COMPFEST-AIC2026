@@ -3,9 +3,10 @@ from __future__ import annotations
 import io
 from typing import Final
 
-from errors import ApiError
 from fastapi import UploadFile
 from PIL import Image, ImageOps, UnidentifiedImageError
+
+from errors import ApiError
 from schemas import ProcessedImage
 
 MAX_IMAGE_BYTES: Final = 5 * 1024 * 1024

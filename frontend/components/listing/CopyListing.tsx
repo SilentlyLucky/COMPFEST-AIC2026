@@ -41,7 +41,7 @@ export function CopyListing({ response, title, description, categoryCode, onBack
       <section className="rounded-[24px] border border-line bg-surface p-5 sm:p-8">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-sm font-medium text-brand">Listing siap disalin</p>
+            <p className="text-sm font-medium text-ink">Listing siap disalin</p>
             <h2 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-ink">
               Pindahkan hasil ke lapakmu
             </h2>
@@ -109,7 +109,7 @@ export function CopyListing({ response, title, description, categoryCode, onBack
           </article>
         </div>
 
-        <p className="mt-5 min-h-6 text-sm text-brand" aria-live="polite">{status}</p>
+        <p className="mt-5 min-h-6 text-sm text-ink" aria-live="polite">{status}</p>
         <Button type="button" size="lg" className="mt-3 w-full sm:w-auto" onClick={() => copyText("Semua hasil", allContent)}>
           <Copy aria-hidden="true" />
           Salin semua hasil

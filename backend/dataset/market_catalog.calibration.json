@@ -1,0 +1,272 @@
+{
+  "artifact_version": "catalog-baseline-holdout-v2",
+  "catalog": {
+    "data_as_of": "2026-08-13",
+    "data_version": "market-catalog-v1-train-20260821-4a846315",
+    "row_count": 21589,
+    "sha256": "4a8463158fb3dbe25dc0a113026ec9ac9e23efdaa3235a662435b34c5a7653e9",
+    "source_split": "dataset/splits/v1/train/records.jsonl"
+  },
+  "category": {
+    "bins": [
+      {
+        "correct_count": 129,
+        "empirical_probability": 0.570796,
+        "sample_count": 226,
+        "score": 57,
+        "upper_bound": 0.5901141103464735
+      },
+      {
+        "correct_count": 166,
+        "empirical_probability": 0.734513,
+        "sample_count": 226,
+        "score": 73,
+        "upper_bound": 0.7496739981833852
+      },
+      {
+        "correct_count": 200,
+        "empirical_probability": 0.884956,
+        "sample_count": 226,
+        "score": 88,
+        "upper_bound": 0.8579804926257996
+      },
+      {
+        "correct_count": 214,
+        "empirical_probability": 0.942731,
+        "sample_count": 227,
+        "score": 94,
+        "upper_bound": 0.9204052642441857
+      },
+      {
+        "correct_count": 214,
+        "empirical_probability": 0.946903,
+        "sample_count": 226,
+        "score": 95,
+        "upper_bound": 0.9573420588279298
+      },
+      {
+        "correct_count": 223,
+        "empirical_probability": 0.986726,
+        "sample_count": 226,
+        "score": 99,
+        "upper_bound": 0.9816709936395622
+      },
+      {
+        "correct_count": 893,
+        "empirical_probability": 0.996652,
+        "sample_count": 896,
+        "score": 100,
+        "upper_bound": 1.0
+      }
+    ],
+    "calibration_no_evidence_count": 0,
+    "calibration_sample_count": 2253,
+    "evaluation": {
+      "accuracy": 0.909337,
+      "calibration_reliability": {
+        "brier_score": 0.063157,
+        "ece": 0.012327,
+        "sample_count": 2217
+      },
+      "classes": {
+        "bumbu_masak": {
+          "f1": 0.86758,
+          "precision": 0.87156,
+          "recall": 0.863636,
+          "support": 110
+        },
+        "camilan_olahan": {
+          "f1": 0.803419,
+          "precision": 0.854545,
+          "recall": 0.758065,
+          "support": 124
+        },
+        "fashion_perawatan": {
+          "f1": 0.956105,
+          "precision": 0.937402,
+          "recall": 0.97557,
+          "support": 614
+        },
+        "kriya_rumah": {
+          "f1": 0.869718,
+          "precision": 0.939163,
+          "recall": 0.809836,
+          "support": 305
+        },
+        "lainnya": {
+          "f1": 0.92795,
+          "precision": 0.916564,
+          "recall": 0.939623,
+          "support": 795
+        },
+        "minuman_herbal": {
+          "f1": 0.840909,
+          "precision": 0.798561,
+          "recall": 0.888,
+          "support": 125
+        },
+        "pokok_tani": {
+          "f1": 0.86014,
+          "precision": 0.866197,
+          "recall": 0.854167,
+          "support": 144
+        }
+      },
+      "macro_f1": 0.875117,
+      "sample_count": 2217
+    },
+    "feature": "top_category_vote_share",
+    "method": "equal_frequency_binned_empirical_correctness",
+    "minimum_bin_samples": 100,
+    "prd_gate": {
+      "ece_max": 0.08,
+      "macro_f1_min": 0.8,
+      "passed": true,
+      "per_class_recall_min": 0.65
+    }
+  },
+  "format_version": 1,
+  "limitations": [
+    "Baseline internal holdout from one catalog snapshot; not an external or temporal validation set.",
+    "Labels and reference prices inherit source-catalog quality and marketplace selection bias.",
+    "Lexical retrieval does not normalize product units, variants, region, seller, or listing age.",
+    "Scores are valid only for the exact catalog checksum and runtime retrieval parameters recorded here.",
+    "All category labels in this catalog were assigned by heuristic rules, not independently human-labeled ground truth.",
+    "Provenance audit found 819 source-train rows absent from the runtime catalog and 26 runtime rows absent from that source split.",
+    "Holdout queries model only production product_type using the first 80 title characters; optional brand, variant, size, and ingredients are unavailable in this catalog."
+  ],
+  "method": "deterministic_grouped_three_way_holdout_listing_metadata_v2",
+  "price": {
+    "calibration_eligible_count": 2219,
+    "calibration_omitted_count": 0,
+    "evaluation": {
+      "assigned_confidence_count": 2170,
+      "coverage": 0.725346,
+      "covered_count": 1574,
+      "eligible_sample_count": 2170,
+      "groups": {
+        "bumbu_masak": {
+          "coverage": 0.691589,
+          "covered_count": 74,
+          "sample_count": 107
+        },
+        "camilan_olahan": {
+          "coverage": 0.761905,
+          "covered_count": 80,
+          "sample_count": 105
+        },
+        "fashion_perawatan": {
+          "coverage": 0.724684,
+          "covered_count": 458,
+          "sample_count": 632
+        },
+        "kriya_rumah": {
+          "coverage": 0.724138,
+          "covered_count": 189,
+          "sample_count": 261
+        },
+        "lainnya": {
+          "coverage": 0.7275,
+          "covered_count": 582,
+          "sample_count": 800
+        },
+        "minuman_herbal": {
+          "coverage": 0.666667,
+          "covered_count": 90,
+          "sample_count": 135
+        },
+        "pokok_tani": {
+          "coverage": 0.776923,
+          "covered_count": 101,
+          "sample_count": 130
+        }
+      },
+      "meets_target_band_75_to_85_pct": false,
+      "reliability": {
+        "brier_score": 0.199546,
+        "ece": 0.016249,
+        "sample_count": 2170
+      }
+    },
+    "groups": {
+      "bumbu_masak": {
+        "covered_count": 93,
+        "sample_count": 121,
+        "score": 77
+      },
+      "camilan_olahan": {
+        "covered_count": 62,
+        "sample_count": 91,
+        "score": 68
+      },
+      "fashion_perawatan": {
+        "covered_count": 443,
+        "sample_count": 607,
+        "score": 73
+      },
+      "kriya_rumah": {
+        "covered_count": 171,
+        "sample_count": 247,
+        "score": 69
+      },
+      "lainnya": {
+        "covered_count": 625,
+        "sample_count": 853,
+        "score": 73
+      },
+      "minuman_herbal": {
+        "covered_count": 98,
+        "sample_count": 152,
+        "score": 64
+      },
+      "pokok_tani": {
+        "covered_count": 115,
+        "sample_count": 148,
+        "score": 78
+      }
+    },
+    "method": "empirical_p10_p90_interval_coverage_by_predicted_category",
+    "minimum_group_samples": 50,
+    "target_coverage": 0.8
+  },
+  "runtime": {
+    "holdout_query_contract": "product_type_title_prefix_80_only_v1",
+    "min_score": 2.0,
+    "minimum_evidence_count": 15,
+    "price_quantiles": [
+      0.1,
+      0.9
+    ],
+    "retrieval_k": 50,
+    "service_version": "tfidf-market-catalog-v1"
+  },
+  "split": {
+    "buckets": 10000,
+    "group_counts": {
+      "calibration": 2183,
+      "evaluation": 2172,
+      "train": 16751
+    },
+    "group_key": "sha256(normalized_title)",
+    "hash_algorithm": "sha256-first-8-bytes-mod-10000",
+    "ranges": {
+      "calibration": [
+        8000,
+        9000
+      ],
+      "evaluation": [
+        9000,
+        10000
+      ],
+      "train": [
+        0,
+        8000
+      ]
+    },
+    "row_counts": {
+      "calibration": 2253,
+      "evaluation": 2217,
+      "train": 17119
+    }
+  }
+}

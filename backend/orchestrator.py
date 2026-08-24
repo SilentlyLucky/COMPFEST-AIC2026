@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import asyncio
 
+from pydantic import ValidationError
+
 from confidence import build_confidence, score_generation
 from errors import ApiError
 from guardrails import ground_copy
 from pricing import align_market_price, calculate_viable_floor
-from pydantic import ValidationError
 from schemas import (
     CATEGORY_LABELS,
     CategoryResult,
@@ -21,7 +22,6 @@ from schemas import (
 from services import ListingServices
 
 GUARDRAIL_VERSION = "ground-v1"
-CALIBRATION_VERSION = "cal-v1"
 TAXONOMY_VERSION = "umkm-id-v1"
 
 
@@ -122,6 +122,14 @@ class ListingOrchestrator:
                 price_model_version=self._services.market.version,
                 price_data_version=self._services.market.data_version,
                 guardrail_version=GUARDRAIL_VERSION,
-                calibration_version=CALIBRATION_VERSION,
+                calibration_version=_calibration_version(self._services),
             ),
         )
+
+
+def _calibration_version(services: ListingServices) -> str | None:
+    category_version = getattr(services.classifier, "calibration_version", None)
+    price_version = getattr(services.market, "calibration_version", None)
+    if category_version and category_version == price_version:
+        return str(category_version)
+    return None

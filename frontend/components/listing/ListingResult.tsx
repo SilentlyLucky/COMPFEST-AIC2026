@@ -108,12 +108,12 @@ function PriceResult({ response }: { response: GenerateListingResponse }) {
     <section aria-labelledby="price-heading" className="rounded-[24px] border border-line bg-surface p-5 sm:p-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-brand">Rekomendasi harga</p>
+          <p className="text-sm font-medium text-ink">Rekomendasi harga</p>
           <h3 id="price-heading" className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-ink sm:text-4xl">
             {price.recommended === null ? "Belum tersedia" : formatRupiah(price.recommended)}
           </h3>
         </div>
-        <span className="w-fit rounded-lg bg-brand-soft px-3 py-2 text-sm font-medium text-brand">
+        <span className="w-fit rounded-lg bg-brand-soft px-3 py-2 text-sm font-medium text-ink">
           {ALIGNMENT_LABELS[price.alignment]}
         </span>
       </div>
@@ -196,7 +196,7 @@ export function ListingResult({
       <section aria-labelledby="copy-heading" className="rounded-[24px] border border-line bg-surface p-5 sm:p-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-sm font-medium text-brand">Kategori terpilih</p>
+            <p className="text-sm font-medium text-ink">Kategori terpilih</p>
             <h2 id="copy-heading" className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-ink">
               {CATEGORY_LABELS[categoryCode]}
             </h2>

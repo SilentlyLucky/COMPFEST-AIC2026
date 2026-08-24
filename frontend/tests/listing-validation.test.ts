@@ -4,26 +4,31 @@ import {
   ALLOWED_IMAGE_TYPES,
   INITIAL_FORM_VALUES,
   MAX_IMAGE_SIZE,
+  firstInvalidField,
   validateImage,
   validateListing,
   type ListingFormValues,
 } from "../lib/listing-validation";
 
-function makeImage(content: BlobPart = "valid-image", type = ALLOWED_IMAGE_TYPES[0]): File {
+function makeImage(
+  content: BlobPart = "valid-image",
+  type = ALLOWED_IMAGE_TYPES[0],
+): File {
   return new File([content], "produk.jpg", { type });
 }
 
-function validValues(overrides: Partial<ListingFormValues> = {}): ListingFormValues {
+function validValues(
+  overrides: Partial<ListingFormValues> = {},
+): ListingFormValues {
   return {
     ...INITIAL_FORM_VALUES,
-    productType: "  Keripik pisang  ",
     productionCost: "25000",
     ...overrides,
   };
 }
 
 describe("listing validation", () => {
-  it("trims user text and keeps backend-compatible defaults in valid metadata", () => {
+  it("omits a blank product-type hint while keeping backend-compatible defaults", () => {
     const result = validateListing(
       validValues({ brand: "  Dapur Sari  ", marketRegionCode: "ID-JK" }),
       makeImage(),
@@ -31,7 +36,6 @@ describe("listing validation", () => {
 
     expect(result.errors).toEqual({});
     expect(result.metadata).toEqual({
-      product_type: "Keripik pisang",
       platform: "umum",
       market_region_code: "ID-JK",
       production_cost_idr: 25000,
@@ -43,10 +47,10 @@ describe("listing validation", () => {
     });
   });
 
-  it("uses safe defaults when optional numeric inputs are cleared and omits an unspecified region", () => {
+  it("uses safe defaults when optional numeric inputs are cleared while preserving the required region", () => {
     const result = validateListing(
       validValues({
-        marketRegionCode: "",
+        marketRegionCode: "ID-JB",
         packagingCost: "",
         otherCost: "",
         targetMargin: "",
@@ -57,25 +61,83 @@ describe("listing validation", () => {
 
     expect(result.errors).toEqual({});
     expect(result.metadata).toEqual({
-      product_type: "Keripik pisang",
       platform: "umum",
+      market_region_code: "ID-JB",
       production_cost_idr: 25000,
       packaging_cost_idr: 0,
       other_cost_idr: 0,
       target_margin_pct: 30,
       platform_fee_pct: 0,
     });
-    expect(result.metadata).not.toHaveProperty("market_region_code");
   });
 
-  it("validates a supplied region only when it is nonblank", () => {
-    const invalid = validateListing(validValues({ marketRegionCode: "ID-jk" }), makeImage());
-    expect(invalid.metadata).toBeNull();
-    expect(invalid.errors.marketRegionCode).toBe("Pilih kode wilayah pasar yang valid.");
+  it("serializes a valid optional product-type hint after trimming", () => {
+    const result = validateListing(
+      validValues({
+        productType: "  Keripik pisang  ",
+        marketRegionCode: "ID-JK",
+      }),
+      makeImage(),
+    );
 
-    const blank = validateListing(validValues({ marketRegionCode: "  " }), makeImage());
-    expect(blank.errors).toEqual({});
-    expect(blank.metadata).not.toHaveProperty("market_region_code");
+    expect(result.errors).toEqual({});
+    expect(result.metadata).toMatchObject({ product_type: "Keripik pisang" });
+  });
+
+  it("rejects only supplied product-type hints outside 2–80 characters", () => {
+    for (const productType of ["x", "a".repeat(81)]) {
+      const result = validateListing(
+        validValues({ productType, marketRegionCode: "ID-JK" }),
+        makeImage(),
+      );
+
+      expect(result.metadata).toBeNull();
+      expect(result.errors.productType).toBe(
+        "Jenis produk harus berisi 2–80 karakter.",
+      );
+    }
+  });
+
+  it("rejects blank or invalid regions and always serializes a valid region", () => {
+    const invalid = validateListing(
+      validValues({ marketRegionCode: "ID-jk" }),
+      makeImage(),
+    );
+    expect(invalid.metadata).toBeNull();
+    expect(invalid.errors.marketRegionCode).toBe(
+      "Pilih kode wilayah pasar yang valid.",
+    );
+
+    const blank = validateListing(
+      validValues({ marketRegionCode: "  " }),
+      makeImage(),
+    );
+    expect(blank.metadata).toBeNull();
+    expect(blank.errors.marketRegionCode).toBe("Pilih wilayah pasar.");
+
+    const valid = validateListing(
+      validValues({ marketRegionCode: "ID-JI" }),
+      makeImage(),
+    );
+    expect(valid.metadata).toMatchObject({ market_region_code: "ID-JI" });
+  });
+
+  it("prioritizes required workspace errors before invalid optional details", () => {
+    const result = validateListing(
+      validValues({
+        productType: "x",
+        marketRegionCode: "",
+        productionCost: "",
+      }),
+      makeImage(),
+    );
+
+    expect(result.errors).toMatchObject({
+      productType: "Jenis produk harus berisi 2–80 karakter.",
+      marketRegionCode: "Pilih wilayah pasar.",
+      productionCost: expect.any(String),
+    });
+    expect(firstInvalidField(result.errors)).toBe("marketRegionCode");
   });
 
   it("rejects a platform value outside the runtime allowlist", () => {
@@ -97,7 +159,9 @@ describe("listing validation", () => {
       "Gunakan file JPEG, PNG, atau WebP.",
     );
     expect(
-      validateImage(makeImage(new Uint8Array(MAX_IMAGE_SIZE + 1), "image/jpeg")),
+      validateImage(
+        makeImage(new Uint8Array(MAX_IMAGE_SIZE + 1), "image/jpeg"),
+      ),
     ).toBe("Ukuran foto maksimal 5 MiB.");
   });
 
@@ -131,6 +195,8 @@ describe("listing validation", () => {
 
     expect(result.metadata).toBeNull();
     expect(result.errors.targetMargin).toContain("kurang dari 95%");
-    expect(result.errors.platformFee).toBe("Kurangi biaya platform atau target margin.");
+    expect(result.errors.platformFee).toBe(
+      "Kurangi biaya platform atau target margin.",
+    );
   });
 });

@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
+import os
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, NoReturn
+from urllib.parse import urlsplit
 
+from ai.category import (
+    DEFAULT_ARTIFACT_PATH,
+    DEFAULT_ENCODER_PATH,
+    OpenClipCategoryClassifier,
+)
 from ai.listing import SulinganVlmGenerator
 from ai.pricing import CatalogPricingService
 from errors import ApiError
@@ -35,21 +43,19 @@ from starlette.exceptions import HTTPException
 API_VERSION = "v1"
 REQUEST_TIMEOUT_SECONDS = 45
 MAX_CONCURRENT_GENERATIONS = 5
+CORS_ALLOWED_ORIGINS_ENV = "CORS_ALLOWED_ORIGINS"
+DEFAULT_CORS_ORIGINS = ("http://localhost:3000",)
 
 ADAPTER_PATH = Path(__file__).resolve().parent / "ai" / "listing" / "model"
-CATALOG_SERVICE = CatalogPricingService()
+CATEGORY_SERVICE = OpenClipCategoryClassifier(
+    artifact_path=DEFAULT_ARTIFACT_PATH,
+    encoder_path=DEFAULT_ENCODER_PATH,
+)
+MARKET_SERVICE = CatalogPricingService()
 DEFAULT_SERVICES = ListingServices(
     generator=SulinganVlmGenerator(ADAPTER_PATH),
-    classifier=CATALOG_SERVICE,
-    market=CATALOG_SERVICE,
-)
-
-app = FastAPI(title="LAPAKIN API", version=API_VERSION)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    classifier=CATEGORY_SERVICE,
+    market=MARKET_SERVICE,
 )
 
 
@@ -79,6 +85,72 @@ generation_capacity = GenerationCapacity(MAX_CONCURRENT_GENERATIONS)
 
 def get_services() -> ListingServices:
     return DEFAULT_SERVICES
+
+
+def parse_cors_origins(raw_origins: str | None = None) -> tuple[str, ...]:
+    configured = (
+        os.getenv(CORS_ALLOWED_ORIGINS_ENV) if raw_origins is None else raw_origins
+    )
+    if configured is None or not configured.strip():
+        return DEFAULT_CORS_ORIGINS
+
+    origins: list[str] = []
+    for item in configured.split(","):
+        origin = item.strip().rstrip("/")
+        if not origin:
+            continue
+        parsed = urlsplit(origin)
+        try:
+            _ = parsed.port
+        except ValueError:
+            valid = False
+        else:
+            valid = True
+        if (
+            not valid
+            or origin == "*"
+            or parsed.scheme not in {"http", "https"}
+            or parsed.hostname is None
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path
+            or parsed.query
+            or parsed.fragment
+            or any(character.isspace() for character in origin)
+            or parsed.netloc.endswith(":")
+        ):
+            raise RuntimeError(f"{CORS_ALLOWED_ORIGINS_ENV} contains an invalid origin")
+        if origin not in origins:
+            origins.append(origin)
+
+    if not origins:
+        raise RuntimeError(f"{CORS_ALLOWED_ORIGINS_ENV} contains no origins")
+    return tuple(origins)
+
+
+async def _startup_services(application: FastAPI) -> ListingServices:
+    provider = application.dependency_overrides.get(get_services, get_services)
+    services = provider()
+    if inspect.isawaitable(services):
+        services = await services
+    return services
+
+
+@asynccontextmanager
+async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+    services = await _startup_services(application)
+    await services.warmup()
+    yield
+
+
+CORS_ORIGINS = parse_cors_origins()
+app = FastAPI(title="LAPAKIN API", version=API_VERSION, lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=list(CORS_ORIGINS),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.middleware("http")

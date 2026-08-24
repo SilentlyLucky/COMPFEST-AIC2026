@@ -1,0 +1,14 @@
+# Ubuntu 22.04 x86_64 server profile: Python 3.10, CPU-only.
+# Keep the PyTorch CPU wheel explicit so pip does not download CUDA runtimes.
+# The current SulinganVlmGenerator still requires CUDA in code. Do not install
+# this profile for full listing generation until CPU inference is implemented
+# and several GB of disk space are available for PyTorch and the base model.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+-r requirements.txt
+
+torch==2.11.0+cpu
+transformers==4.57.3
+peft==0.20.0
+accelerate>=1.0.0,<2
+pyarrow>=16.0,<24

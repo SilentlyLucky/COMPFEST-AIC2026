@@ -1,7 +1,10 @@
 # Optional local inference runtime. Install only on the GPU worker.
 -r requirements.txt
 torch>=2.4.0,<3
+torchvision>=0.19.0,<1
 transformers>=4.57.3,<5
 peft>=0.20.0,<0.21
 accelerate>=1.0.0,<2
 pyarrow>=16.0
+open_clip_torch>=2.30.0,<3
+safetensors>=0.4.0,<1

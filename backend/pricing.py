@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
 from decimal import ROUND_CEILING, Decimal
 
 from schemas import MarketEvidence, MarketInterval, PriceAlignment, PriceDecision
@@ -30,7 +30,7 @@ def align_market_price(
     *,
     today: date | None = None,
 ) -> PriceDecision:
-    reference_date = today or datetime.now(UTC).date()
+    reference_date = today or datetime.now(timezone.utc).date()
     if evidence is None:
         return _insufficient_price(viable_floor)
 

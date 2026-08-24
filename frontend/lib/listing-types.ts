@@ -22,12 +22,13 @@ export const CATEGORY_LABELS: Record<CategoryCode, string> = {
   lainnya: "Lainnya",
 };
 
-export type PriceAlignment = "within_market" | "above_market" | "insufficient_evidence";
+export type PriceAlignment =
+  "within_market" | "above_market" | "insufficient_evidence";
 
 export interface ListingMetadata {
-  product_type: string;
+  product_type?: string | null;
   platform: Platform;
-  market_region_code?: string;
+  market_region_code: string;
   production_cost_idr: number;
   brand?: string;
   variant?: string;

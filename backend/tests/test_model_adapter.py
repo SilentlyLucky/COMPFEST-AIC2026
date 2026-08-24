@@ -1,3 +1,4 @@
+import asyncio
 import sys
 from contextlib import nullcontext
 from decimal import Decimal
@@ -5,10 +6,17 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from ai.listing import inference
-from ai.listing.inference import MODEL_PROMPT, REQUIRED_ASSETS, SulinganVlmGenerator
-from errors import ApiError
 from PIL import Image
+
+from ai.listing import inference
+from ai.listing.inference import (
+    BASE_MODEL,
+    BASE_MODEL_REVISION,
+    MODEL_PROMPT,
+    REQUIRED_ASSETS,
+    SulinganVlmGenerator,
+)
+from errors import ApiError
 from schemas import ListingMetadata, ProcessedImage
 
 
@@ -25,6 +33,7 @@ def _install_fake_runtime(monkeypatch) -> None:
         ("torch", fake_torch),
         ("transformers", SimpleNamespace()),
         ("peft", SimpleNamespace()),
+        ("huggingface_hub", SimpleNamespace()),
     ):
         monkeypatch.setitem(sys.modules, name, module)
 
@@ -82,6 +91,84 @@ def test_readiness_reports_broken_runtime_import_without_leaking_paths(
     assert readiness.startable is False
     assert readiness.reason == "optional model runtime dependencies are unavailable"
     assert str(tmp_path) not in str(readiness)
+
+
+def test_warmup_loads_processor_and_model_from_the_same_pinned_base_revision(
+    tmp_path, monkeypatch
+) -> None:
+    calls = {}
+    processor = object()
+    base_model = object()
+    snapshot_path = str(tmp_path / "cached-base-model")
+
+    class AdaptedModel:
+        evaluated = False
+
+        def eval(self):
+            self.evaluated = True
+            return self
+
+    adapted_model = AdaptedModel()
+
+    class AutoProcessor:
+        @staticmethod
+        def from_pretrained(source, **kwargs):
+            calls["processor"] = (source, kwargs)
+            return processor
+
+    class AutoModelForImageTextToText:
+        @staticmethod
+        def from_pretrained(source, **kwargs):
+            calls["model"] = (source, kwargs)
+            return base_model
+
+    class PeftModel:
+        @staticmethod
+        def from_pretrained(model, adapter_path):
+            calls["adapter"] = (model, adapter_path)
+            return adapted_model
+
+    def snapshot_download(source, **kwargs):
+        calls["snapshot"] = (source, kwargs)
+        return snapshot_path
+
+    fake_torch = SimpleNamespace(bfloat16=object())
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+    monkeypatch.setitem(
+        sys.modules,
+        "transformers",
+        SimpleNamespace(
+            AutoModelForImageTextToText=AutoModelForImageTextToText,
+            AutoProcessor=AutoProcessor,
+        ),
+    )
+    monkeypatch.setitem(sys.modules, "peft", SimpleNamespace(PeftModel=PeftModel))
+    monkeypatch.setitem(
+        sys.modules,
+        "huggingface_hub",
+        SimpleNamespace(snapshot_download=snapshot_download),
+    )
+
+    generator = SulinganVlmGenerator(tmp_path)
+    asyncio.run(generator.warmup())
+
+    assert calls["snapshot"] == (
+        BASE_MODEL,
+        {"revision": BASE_MODEL_REVISION, "local_files_only": True},
+    )
+    assert calls["processor"] == (snapshot_path, {"local_files_only": True})
+    assert calls["model"] == (
+        snapshot_path,
+        {
+            "local_files_only": True,
+            "dtype": fake_torch.bfloat16,
+            "device_map": "cuda",
+        },
+    )
+    assert calls["adapter"] == (base_model, tmp_path)
+    assert adapted_model.evaluated is True
+    assert generator._processor is processor
+    assert generator._model is adapted_model
 
 
 class _Encoded(dict):

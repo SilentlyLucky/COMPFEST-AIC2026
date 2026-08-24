@@ -1,12 +1,21 @@
 "use client";
 
-import type { ChangeEvent, FormEvent } from "react";
-import { Camera, CircleDollarSign, ImageUp, LoaderCircle, Package, X } from "lucide-react";
+import {
+  useState,
+  type ChangeEvent,
+  type DragEvent,
+  type FormEvent,
+} from "react";
+import { ChevronDown, FileImage, LoaderCircle, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { FieldErrors, ListingField, ListingFormValues } from "@/lib/listing-validation";
+import type {
+  FieldErrors,
+  ListingField,
+  ListingFormValues,
+} from "@/lib/listing-validation";
 
 const PLATFORMS = [
   ["umum", "Umum"],
@@ -14,7 +23,6 @@ const PLATFORMS = [
   ["shopee", "Shopee"],
   ["blibli", "Blibli"],
 ] as const;
-
 const REGIONS = [
   ["ID-JK", "DKI Jakarta"],
   ["ID-JB", "Jawa Barat"],
@@ -33,30 +41,150 @@ interface ListingFormProps {
   errors: FieldErrors;
   isSubmitting: boolean;
   progressMessage: string | null;
+  detailsOpen: boolean;
+  pricingOpen: boolean;
+  hasSubmitError: boolean;
+  onDetailsOpenChange: (open: boolean) => void;
+  onPricingOpenChange: (open: boolean) => void;
   onFieldChange: (field: keyof ListingFormValues, value: string) => void;
   onImageChange: (file: File | null) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onCancel: () => void;
 }
 
-function FieldError({ field, errors }: { field: ListingField; errors: FieldErrors }) {
+function FieldError({
+  field,
+  errors,
+}: {
+  field: ListingField;
+  errors: FieldErrors;
+}) {
   if (!errors[field]) return null;
   return (
-    <p id={`${field}-error`} role="alert" className="mt-2 text-sm leading-6 text-status-error">
+    <p
+      id={`${field}-error`}
+      role="alert"
+      className="mt-2 text-sm leading-6 text-status-error"
+    >
       {errors[field]}
     </p>
   );
 }
 
-function errorProps(field: ListingField, errors: FieldErrors, describedBy?: string) {
-  const describedByIds = [describedBy, errors[field] ? `${field}-error` : undefined]
+function errorProps(
+  field: ListingField,
+  errors: FieldErrors,
+  describedBy?: string,
+) {
+  const describedByIds = [
+    describedBy,
+    errors[field] ? `${field}-error` : undefined,
+  ]
     .filter(Boolean)
     .join(" ");
-
   return {
-    "aria-invalid": Boolean(errors[field]),
+    "aria-invalid": errors[field] ? true : undefined,
     "aria-describedby": describedByIds || undefined,
   };
+}
+
+function MoneyInput({
+  field,
+  label,
+  value,
+  errors,
+  disabled,
+  min,
+  required = false,
+  onChange,
+}: {
+  field: Extract<
+    ListingField,
+    "productionCost" | "packagingCost" | "otherCost"
+  >;
+  label: string;
+  value: string;
+  errors: FieldErrors;
+  disabled: boolean;
+  min: number;
+  required?: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <Label htmlFor={field}>{label}</Label>
+      <div className="relative mt-3">
+        <span
+          className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm font-medium text-ink-muted"
+          aria-hidden="true"
+        >
+          Rp
+        </span>
+        <Input
+          id={field}
+          type="number"
+          inputMode="numeric"
+          min={min}
+          max={1_000_000_000}
+          step={1}
+          className="rounded-[12px] bg-[#FBFCFE] pl-10"
+          value={value}
+          disabled={disabled}
+          required={required}
+          aria-required={required || undefined}
+          onChange={(event) => onChange(event.target.value)}
+          {...errorProps(field, errors)}
+        />
+      </div>
+      <FieldError field={field} errors={errors} />
+    </div>
+  );
+}
+
+function PercentInput({
+  field,
+  label,
+  value,
+  errors,
+  disabled,
+  max,
+  onChange,
+}: {
+  field: Extract<ListingField, "targetMargin" | "platformFee">;
+  label: string;
+  value: string;
+  errors: FieldErrors;
+  disabled: boolean;
+  max: number;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <Label htmlFor={field}>{label}</Label>
+      <div className="relative mt-3">
+        <Input
+          id={field}
+          type="number"
+          inputMode="decimal"
+          min={0}
+          max={max}
+          step="0.1"
+          className="rounded-[12px] bg-[#FBFCFE] pr-10"
+          value={value}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+          {...errorProps(field, errors)}
+        />
+        <span
+          className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-sm font-medium text-ink-muted"
+          aria-hidden="true"
+        >
+          %
+        </span>
+      </div>
+      <FieldError field={field} errors={errors} />
+    </div>
+  );
 }
 
 export function ListingForm({
@@ -65,43 +193,66 @@ export function ListingForm({
   errors,
   isSubmitting,
   progressMessage,
+  detailsOpen,
+  pricingOpen,
+  hasSubmitError,
+  onDetailsOpenChange,
+  onPricingOpenChange,
   onFieldChange,
   onImageChange,
   onSubmit,
   onCancel,
 }: ListingFormProps) {
+  const [isDragging, setIsDragging] = useState(false);
+
+  function selectFile(file: File | null) {
+    if (!isSubmitting) onImageChange(file);
+  }
+
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    onImageChange(event.target.files?.[0] ?? null);
+    selectFile(event.target.files?.[0] ?? null);
+    event.target.value = "";
+  }
+
+  function handleDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    setIsDragging(false);
+    selectFile(event.dataTransfer.files?.[0] ?? null);
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate aria-busy={isSubmitting} className="space-y-6 md:space-y-8">
-      <section
-        aria-labelledby="foto-heading"
-        className="overflow-hidden rounded-[28px] border border-line/70 bg-surface shadow-[0_24px_64px_rgba(16,37,28,0.08)]"
-      >
-        <div className="flex items-start gap-4 border-b border-line/60 px-5 py-5 sm:px-8 sm:py-6 lg:px-10">
-          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-brand-soft text-brand">
-            <Camera className="size-6" aria-hidden="true" />
-          </span>
-          <div className="max-w-2xl">
-            <h2 id="foto-heading" className="text-xl font-semibold tracking-[-0.03em] text-ink sm:text-2xl">
-              Foto produk
+    <form
+      onSubmit={onSubmit}
+      noValidate
+      aria-busy={isSubmitting}
+      className="space-y-8 pb-28 lg:pb-0"
+    >
+      <div className="grid gap-8 rounded-[20px] border border-[#DCE5ED] bg-surface p-5 sm:p-7 lg:grid-cols-[minmax(300px,.85fr)_minmax(0,1.15fr)] lg:gap-x-[clamp(2.25rem,5vw,4.5rem)] lg:p-9">
+        <section aria-labelledby="foto-heading">
+          <div>
+            <h2
+              id="foto-heading"
+              className="text-lg font-semibold tracking-[-0.02em] text-ink"
+            >
+              Foto produk <span className="text-link">(wajib)</span>
             </h2>
-            <p className="mt-2 leading-7 text-ink-muted">
-              Gunakan satu foto utama yang terang. Format JPEG, PNG, atau WebP dengan ukuran maksimal 5 MiB.
+            <p
+              id="image-help"
+              className="mt-1 text-sm leading-6 text-ink-muted"
+            >
+              JPEG, PNG, atau WebP · maksimal 5 MB
             </p>
           </div>
-        </div>
-
-        <div className="p-5 sm:p-8 lg:p-10">
           <Label
             htmlFor="image"
-            className={`group relative flex min-h-72 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[24px] border-2 border-dashed p-6 text-center transition-colors sm:min-h-80 ${
-              errors.image
-                ? "border-status-error bg-status-error-soft"
-                : "border-brand/32 bg-brand-soft/40 hover:border-brand hover:bg-brand-soft/70"
-            } focus-within:border-brand focus-within:ring-4 focus-within:ring-brand`}
+            onDragEnter={(event) => {
+              event.preventDefault();
+              if (!isSubmitting) setIsDragging(true);
+            }}
+            onDragOver={(event) => event.preventDefault()}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            className={`relative mt-4 flex min-h-56 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border p-6 text-center transition-colors motion-reduce:transition-none sm:min-h-64 lg:min-h-80 ${previewUrl ? "border-[#AAB8C7] bg-[#F3F8FC]" : errors.image ? "border-2 border-dashed border-status-error bg-[#FFF8F7]" : isDragging ? "border-2 border-dashed border-brand bg-brand-soft" : "border-2 border-dashed border-[#9AC9E8] bg-[#F3F8FC] hover:border-brand"} focus-within:border-brand focus-within:ring-4 focus-within:ring-brand/28`}
           >
             <Input
               id="image"
@@ -112,320 +263,363 @@ export function ListingForm({
               disabled={isSubmitting}
               required
               aria-required="true"
-              {...errorProps("image", errors)}
+              {...errorProps("image", errors, "image-help")}
             />
             {previewUrl ? (
-              // Object URLs are browser-local previews and cannot be optimized by next/image.
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={previewUrl} alt="Pratinjau foto produk" className="absolute inset-0 size-full object-cover" />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element -- Object URLs are browser-local previews. */}
+                <img
+                  src={previewUrl}
+                  alt="Pratinjau foto produk"
+                  className="absolute inset-0 size-full object-contain p-4"
+                />
+              </>
             ) : (
               <>
-                <span className="grid size-16 place-items-center rounded-2xl bg-surface text-brand shadow-[0_12px_32px_rgba(16,37,28,0.12)]">
-                  <ImageUp className="size-7" aria-hidden="true" />
+                <FileImage className="size-10 text-brand" aria-hidden="true" />
+                <span className="mt-4 font-semibold text-ink">
+                  Pilih foto produk
                 </span>
-                <span className="mt-5 text-lg font-semibold text-ink">Pilih foto produk</span>
-                <span className="mt-2 max-w-sm text-sm leading-6 text-ink-muted">JPEG, PNG, atau WebP hingga 5 MiB</span>
+                <span className="mt-2 text-sm leading-6 text-ink-muted">
+                  atau seret foto ke sini
+                </span>
               </>
             )}
             {previewUrl && (
-              <span className="absolute bottom-4 left-4 rounded-lg bg-ink/88 px-3 py-2 text-sm text-white">
+              <span className="absolute bottom-4 left-4 rounded-lg bg-ink px-3 py-2 text-sm font-medium text-white">
                 Ganti foto
               </span>
             )}
           </Label>
+          {previewUrl && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="mt-3 text-status-error"
+              onClick={() => selectFile(null)}
+              disabled={isSubmitting}
+            >
+              <Trash2 aria-hidden="true" />
+              Hapus foto
+            </Button>
+          )}
           <FieldError field="image" errors={errors} />
-        </div>
-      </section>
+        </section>
 
-      <section
-        aria-labelledby="facts-heading"
-        className="overflow-hidden rounded-[28px] border border-line/70 bg-surface shadow-[0_24px_64px_rgba(16,37,28,0.08)]"
-      >
-        <div className="flex items-start gap-4 border-b border-line/60 px-5 py-5 sm:px-8 sm:py-6 lg:px-10">
-          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-brand-soft text-brand">
-            <Package className="size-6" aria-hidden="true" />
-          </span>
-          <div className="max-w-2xl">
-            <h2 id="facts-heading" className="text-xl font-semibold tracking-[-0.03em] text-ink sm:text-2xl">
-              Fakta produk dan pasar
-            </h2>
-            <p className="mt-2 leading-7 text-ink-muted">
-              Isi hanya informasi yang benar-benar kamu ketahui. Kolom bertanda wajib diperlukan untuk membuat hasil.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid gap-x-6 gap-y-7 p-5 sm:p-8 md:grid-cols-2 lg:p-10">
-          <div className="md:col-span-2">
-            <Label htmlFor="productType">Jenis produk <span aria-hidden="true">*</span></Label>
-            <Input
-              id="productType"
-              className="mt-3"
-              value={values.productType}
-              maxLength={80}
-              placeholder="Contoh: keripik pisang cokelat"
-              disabled={isSubmitting}
-              required
-              aria-required="true"
-              onChange={(event) => onFieldChange("productType", event.target.value)}
-              {...errorProps("productType", errors)}
-            />
-            <FieldError field="productType" errors={errors} />
-          </div>
-
+        <section
+          aria-labelledby="facts-heading"
+          className="border-t border-line/70 pt-6 lg:border-t-0 lg:pt-0"
+        >
           <div>
-            <Label htmlFor="platform">Platform tujuan <span aria-hidden="true">*</span></Label>
-            <select
-              id="platform"
-              className="form-select mt-3"
-              value={values.platform}
-              disabled={isSubmitting}
-              required
-              aria-required="true"
-              onChange={(event) => onFieldChange("platform", event.target.value)}
-              {...errorProps("platform", errors)}
+            <h2
+              id="facts-heading"
+              className="text-lg font-semibold tracking-[-0.02em] text-ink"
             >
-              {PLATFORMS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-            <FieldError field="platform" errors={errors} />
-          </div>
-
-          <div>
-            <Label htmlFor="marketRegionCode">Wilayah pasar</Label>
-            <select
-              id="marketRegionCode"
-              className="form-select mt-3"
-              value={values.marketRegionCode}
-              disabled={isSubmitting}
-              onChange={(event) => onFieldChange("marketRegionCode", event.target.value)}
-              {...errorProps("marketRegionCode", errors, "marketRegionCode-help")}
-            >
-              <option value="">Tidak ditentukan</option>
-              {REGIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-            <p id="marketRegionCode-help" className="mt-2 text-sm leading-6 text-ink-muted">
-              Jika dipilih, wilayah disimpan untuk perbandingan regional di masa depan. Saat ini wilayah belum memengaruhi rekomendasi.
-            </p>
-            <FieldError field="marketRegionCode" errors={errors} />
-          </div>
-
-          <div>
-            <Label htmlFor="brand">Merek</Label>
-            <Input
-              id="brand"
-              className="mt-3"
-              value={values.brand}
-              maxLength={120}
-              placeholder="Contoh: Dapur Bu Sari"
-              disabled={isSubmitting}
-              onChange={(event) => onFieldChange("brand", event.target.value)}
-              {...errorProps("brand", errors)}
-            />
-            <FieldError field="brand" errors={errors} />
-          </div>
-
-          <div>
-            <Label htmlFor="variant">Varian</Label>
-            <Input
-              id="variant"
-              className="mt-3"
-              value={values.variant}
-              maxLength={120}
-              placeholder="Contoh: cokelat"
-              disabled={isSubmitting}
-              onChange={(event) => onFieldChange("variant", event.target.value)}
-              {...errorProps("variant", errors)}
-            />
-            <FieldError field="variant" errors={errors} />
-          </div>
-
-          <div>
-            <Label htmlFor="size">Ukuran atau isi</Label>
-            <Input
-              id="size"
-              className="mt-3"
-              value={values.size}
-              maxLength={120}
-              placeholder="Contoh: 200 g"
-              disabled={isSubmitting}
-              onChange={(event) => onFieldChange("size", event.target.value)}
-              {...errorProps("size", errors)}
-            />
-            <FieldError field="size" errors={errors} />
-          </div>
-
-          <div>
-            <Label htmlFor="materialOrIngredients">Bahan atau komposisi</Label>
-            <Input
-              id="materialOrIngredients"
-              className="mt-3"
-              value={values.materialOrIngredients}
-              maxLength={120}
-              placeholder="Contoh: pisang kepok, cokelat"
-              disabled={isSubmitting}
-              onChange={(event) => onFieldChange("materialOrIngredients", event.target.value)}
-              {...errorProps("materialOrIngredients", errors)}
-            />
-            <FieldError field="materialOrIngredients" errors={errors} />
-          </div>
-        </div>
-      </section>
-
-      <section
-        aria-labelledby="cost-heading"
-        className="overflow-hidden rounded-[28px] border border-line/70 bg-surface shadow-[0_24px_64px_rgba(16,37,28,0.08)]"
-      >
-        <div className="flex items-start gap-4 border-b border-line/60 px-5 py-5 sm:px-8 sm:py-6 lg:px-10">
-          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-brand-soft text-brand">
-            <CircleDollarSign className="size-6" aria-hidden="true" />
-          </span>
-          <div className="max-w-2xl">
-            <h2 id="cost-heading" className="text-xl font-semibold tracking-[-0.03em] text-ink sm:text-2xl">
-              Biaya dan target
+              Informasi utama
             </h2>
-            <p className="mt-2 leading-7 text-ink-muted">
-              Masukkan biaya untuk satu unit yang dijual. Margin dan potongan dihitung dari harga jual.
+            <p className="mt-1 text-sm leading-6 text-ink-muted">
+              Isi informasi dasar yang diperlukan untuk membuat rekomendasi.
             </p>
           </div>
-        </div>
-
-        <div className="grid gap-x-6 gap-y-7 p-5 sm:p-8 md:grid-cols-2 lg:p-10">
-          <div>
-            <Label htmlFor="productionCost">Biaya produksi per unit terjual <span aria-hidden="true">*</span></Label>
-            <Input
-              id="productionCost"
-              type="number"
-              inputMode="numeric"
-              min={1000}
-              max={1_000_000_000}
-              step={1}
-              className="mt-3"
-              value={values.productionCost}
-              placeholder="Contoh: 25000"
-              disabled={isSubmitting}
-              required
-              aria-required="true"
-              onChange={(event) => onFieldChange("productionCost", event.target.value)}
-              {...errorProps("productionCost", errors)}
-            />
-            <FieldError field="productionCost" errors={errors} />
+          <div className="mt-6 grid gap-x-6 gap-y-6 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="platform">
+                Platform tujuan <span className="text-link">(wajib)</span>
+              </Label>
+              <select
+                id="platform"
+                className="form-select mt-3"
+                value={values.platform}
+                disabled={isSubmitting}
+                required
+                aria-required="true"
+                onChange={(event) =>
+                  onFieldChange("platform", event.target.value)
+                }
+                {...errorProps("platform", errors)}
+              >
+                {PLATFORMS.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <FieldError field="platform" errors={errors} />
+            </div>
+            <div>
+              <Label htmlFor="marketRegionCode">
+                Wilayah pasar <span className="text-link">(wajib)</span>
+              </Label>
+              <select
+                id="marketRegionCode"
+                className="form-select mt-3"
+                value={values.marketRegionCode}
+                disabled={isSubmitting}
+                required
+                aria-required="true"
+                onChange={(event) =>
+                  onFieldChange("marketRegionCode", event.target.value)
+                }
+                {...errorProps("marketRegionCode", errors)}
+              >
+                <option value="">Pilih wilayah</option>
+                {REGIONS.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <FieldError field="marketRegionCode" errors={errors} />
+            </div>
+            <div className="sm:col-span-2">
+              <MoneyInput
+                field="productionCost"
+                label="Biaya produksi per unit (wajib)"
+                value={values.productionCost}
+                errors={errors}
+                disabled={isSubmitting}
+                min={1000}
+                required
+                onChange={(value) => onFieldChange("productionCost", value)}
+              />
+            </div>
           </div>
+        </section>
+      </div>
 
-          <div>
-            <Label htmlFor="packagingCost">Biaya kemasan per unit terjual</Label>
-            <Input
-              id="packagingCost"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              max={1_000_000_000}
-              step={1}
-              className="mt-3"
-              value={values.packagingCost}
-              disabled={isSubmitting}
-              onChange={(event) => onFieldChange("packagingCost", event.target.value)}
-              {...errorProps("packagingCost", errors)}
-            />
-            <FieldError field="packagingCost" errors={errors} />
-          </div>
-
-          <div>
-            <Label htmlFor="otherCost">Biaya lain per unit terjual</Label>
-            <Input
-              id="otherCost"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              max={1_000_000_000}
-              step={1}
-              className="mt-3"
-              value={values.otherCost}
-              disabled={isSubmitting}
-              onChange={(event) => onFieldChange("otherCost", event.target.value)}
-              {...errorProps("otherCost", errors)}
-            />
-            <FieldError field="otherCost" errors={errors} />
-          </div>
-
-          <div>
-            <Label htmlFor="targetMargin">Target margin (%)</Label>
-            <Input
-              id="targetMargin"
-              type="number"
-              inputMode="decimal"
-              min={0}
-              max={80}
-              step="0.1"
-              placeholder="30"
-              className="mt-3"
-              value={values.targetMargin}
-              disabled={isSubmitting}
-              onChange={(event) => onFieldChange("targetMargin", event.target.value)}
-              {...errorProps("targetMargin", errors, "targetMargin-help")}
-            />
-            <p id="targetMargin-help" className="mt-2 text-sm leading-6 text-ink-muted">
-              Persentase laba dari harga jual. Jika dikosongkan, LAPAKIN memakai 30%.
+      <section aria-labelledby="details-heading" className="rounded-2xl border border-[#E1EAF1] bg-[#F8FBFD] p-4 sm:p-5">
+        <button
+          type="button"
+          className="flex min-h-11 w-full items-center justify-between gap-4 rounded-xl px-1 text-left font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
+          aria-expanded={detailsOpen}
+          aria-controls="details-content"
+          onClick={() => onDetailsOpenChange(!detailsOpen)}
+        >
+          <span id="details-heading">
+            Tambahkan detail produk{" "}
+            <span className="ml-2 text-sm font-normal text-ink-muted">
+              Opsional
+            </span>
+          </span>
+          <ChevronDown
+            className={`size-5 shrink-0 transition-transform motion-reduce:transition-none ${detailsOpen ? "rotate-180" : ""}`}
+            aria-hidden="true"
+          />
+        </button>
+        {detailsOpen && (
+          <div
+            id="details-content"
+            className="grid gap-x-6 gap-y-6 pt-4 sm:grid-cols-2"
+          >
+            <p className="sm:col-span-2 text-sm leading-6 text-ink-muted">
+              Tambahkan hanya informasi yang memang kamu ketahui.
             </p>
-            <FieldError field="targetMargin" errors={errors} />
-          </div>
-
-          <div>
-            <Label htmlFor="platformFee">Biaya platform (%)</Label>
-            <Input
-              id="platformFee"
-              type="number"
-              inputMode="decimal"
-              min={0}
-              max={40}
-              step="0.1"
-              placeholder="0"
-              className="mt-3"
-              value={values.platformFee}
-              disabled={isSubmitting}
-              onChange={(event) => onFieldChange("platformFee", event.target.value)}
-              {...errorProps("platformFee", errors, "platformFee-help")}
-            />
-            <p id="platformFee-help" className="mt-2 text-sm leading-6 text-ink-muted">
-              Total potongan platform per transaksi. Jika dikosongkan, nilainya 0%.
-            </p>
-            <FieldError field="platformFee" errors={errors} />
-            {values.platform !== "umum" && Number(values.platformFee || 0) === 0 && (
-              <p className="mt-2 text-sm leading-6 text-status-warning" role="note">
-                Platform tujuan dapat mengenakan potongan, tetapi biaya platform masih 0%. Harga mungkin belum memperhitungkan potongan ini.
+            <div className="sm:col-span-2">
+              <Label htmlFor="productType">Jenis produk</Label>
+              <Input
+                id="productType"
+                className="mt-3 rounded-[12px] bg-[#FBFCFE]"
+                value={values.productType}
+                maxLength={80}
+                placeholder="Contoh: keripik pisang cokelat"
+                disabled={isSubmitting}
+                onChange={(event) =>
+                  onFieldChange("productType", event.target.value)
+                }
+                {...errorProps("productType", errors, "product-type-help")}
+              />
+              <p
+                id="product-type-help"
+                className="mt-2 text-sm leading-6 text-ink-muted"
+              >
+                Tambahkan jika kamu sudah tahu jenis produknya.
               </p>
-            )}
+              <FieldError field="productType" errors={errors} />
+            </div>
+            <div>
+              <Label htmlFor="brand">Merek</Label>
+              <Input
+                id="brand"
+                className="mt-3 rounded-[12px] bg-[#FBFCFE]"
+                value={values.brand}
+                maxLength={120}
+                placeholder="Contoh: Dapur Bu Sari"
+                disabled={isSubmitting}
+                onChange={(event) => onFieldChange("brand", event.target.value)}
+                {...errorProps("brand", errors)}
+              />
+              <FieldError field="brand" errors={errors} />
+            </div>
+            <div>
+              <Label htmlFor="variant">Varian</Label>
+              <Input
+                id="variant"
+                className="mt-3 rounded-[12px] bg-[#FBFCFE]"
+                value={values.variant}
+                maxLength={120}
+                placeholder="Contoh: cokelat"
+                disabled={isSubmitting}
+                onChange={(event) =>
+                  onFieldChange("variant", event.target.value)
+                }
+                {...errorProps("variant", errors)}
+              />
+              <FieldError field="variant" errors={errors} />
+            </div>
+            <div>
+              <Label htmlFor="size">Ukuran atau isi</Label>
+              <Input
+                id="size"
+                className="mt-3 rounded-[12px] bg-[#FBFCFE]"
+                value={values.size}
+                maxLength={120}
+                placeholder="Contoh: 200 g"
+                disabled={isSubmitting}
+                onChange={(event) => onFieldChange("size", event.target.value)}
+                {...errorProps("size", errors)}
+              />
+              <FieldError field="size" errors={errors} />
+            </div>
+            <div>
+              <Label htmlFor="materialOrIngredients">
+                Bahan atau komposisi
+              </Label>
+              <Input
+                id="materialOrIngredients"
+                className="mt-3 rounded-[12px] bg-[#FBFCFE]"
+                value={values.materialOrIngredients}
+                maxLength={120}
+                placeholder="Contoh: pisang kepok, cokelat"
+                disabled={isSubmitting}
+                onChange={(event) =>
+                  onFieldChange("materialOrIngredients", event.target.value)
+                }
+                {...errorProps("materialOrIngredients", errors)}
+              />
+              <FieldError field="materialOrIngredients" errors={errors} />
+            </div>
           </div>
-        </div>
+        )}
       </section>
 
-      <div className="flex flex-col-reverse gap-3 rounded-[24px] border border-line/70 bg-surface p-4 shadow-[0_16px_48px_rgba(16,37,28,0.08)] sm:flex-row sm:items-center sm:justify-end sm:p-5">
-        {isSubmitting && (
-          <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={onCancel}>
-            <X aria-hidden="true" />
-            Batalkan
-          </Button>
+      <section aria-labelledby="pricing-heading" className="rounded-2xl border border-[#E1EAF1] bg-[#F8FBFD] p-4 sm:p-5">
+        <button
+          type="button"
+          className="flex min-h-11 w-full items-center justify-between gap-4 rounded-xl px-1 text-left font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
+          aria-expanded={pricingOpen}
+          aria-controls="pricing-content"
+          onClick={() => onPricingOpenChange(!pricingOpen)}
+        >
+          <span id="pricing-heading">
+            Atur biaya &amp; margin{" "}
+            <span className="ml-2 text-sm font-normal text-ink-muted">
+              Opsional
+            </span>
+          </span>
+          <ChevronDown
+            className={`size-5 shrink-0 transition-transform motion-reduce:transition-none ${pricingOpen ? "rotate-180" : ""}`}
+            aria-hidden="true"
+          />
+        </button>
+        {pricingOpen && (
+          <div
+            id="pricing-content"
+            className="grid gap-x-6 gap-y-6 pt-4 sm:grid-cols-2"
+          >
+            <p className="sm:col-span-2 text-sm leading-6 text-ink-muted">
+              Sesuaikan jika ada biaya tambahan atau target tertentu.
+            </p>
+            <MoneyInput
+              field="packagingCost"
+              label="Biaya kemasan per unit"
+              value={values.packagingCost}
+              errors={errors}
+              disabled={isSubmitting}
+              min={0}
+              onChange={(value) => onFieldChange("packagingCost", value)}
+            />
+            <MoneyInput
+              field="otherCost"
+              label="Biaya lain per unit"
+              value={values.otherCost}
+              errors={errors}
+              disabled={isSubmitting}
+              min={0}
+              onChange={(value) => onFieldChange("otherCost", value)}
+            />
+            <PercentInput
+              field="targetMargin"
+              label="Target margin"
+              value={values.targetMargin}
+              errors={errors}
+              disabled={isSubmitting}
+              max={80}
+              onChange={(value) => onFieldChange("targetMargin", value)}
+            />
+            <div>
+              <PercentInput
+                field="platformFee"
+                label="Biaya platform"
+                value={values.platformFee}
+                errors={errors}
+                disabled={isSubmitting}
+                max={40}
+                onChange={(value) => onFieldChange("platformFee", value)}
+              />
+              {values.platform !== "umum" &&
+                Number(values.platformFee || 0) === 0 && (
+                  <p className="mt-2 flex items-center gap-2 text-sm leading-6 text-ink-muted">
+                    <span
+                      className="size-2 rounded-full bg-amber"
+                      aria-hidden="true"
+                    />
+                    Potongan platform belum dihitung.
+                  </p>
+                )}
+            </div>
+          </div>
+        )}
+      </section>
+
+      <div className="lg:ml-auto lg:w-fit">
+        {hasSubmitError && (
+          <p role="alert" className="mb-3 text-sm leading-6 text-status-error lg:text-right">
+            Lengkapi bagian yang ditandai untuk melanjutkan.
+          </p>
         )}
         {isSubmitting && progressMessage && (
-          <p className="flex min-h-11 flex-1 items-center text-sm font-medium text-ink" role="status" aria-live="polite" aria-atomic="true">
-            <span className="mr-3 inline-block size-2 animate-pulse rounded-full bg-brand" aria-hidden="true" />
+          <p className="mb-3 text-sm leading-6 text-ink-muted lg:text-right" role="status">
             {progressMessage}
           </p>
         )}
-        <Button
-          type="submit"
-          size="lg"
-          className="w-full shadow-[0_12px_28px_rgba(47,111,87,0.24)] sm:w-auto sm:min-w-48"
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? (
-            <>
-              <LoaderCircle className="animate-spin" aria-hidden="true" />
-              Menyusun listing
-            </>
-          ) : (
-            "Buat listing"
+        <div className="fixed inset-x-0 bottom-0 z-30 flex gap-3 border-t border-[#DCE5ED] bg-surface px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-4 sm:px-8 lg:static lg:inset-auto lg:border-0 lg:bg-transparent lg:p-0">
+          {isSubmitting && (
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1 lg:flex-none"
+              onClick={onCancel}
+            >
+              <X aria-hidden="true" />
+              Batalkan
+            </Button>
           )}
-        </Button>
+          <Button
+            type="submit"
+            size="lg"
+            className="flex-1 rounded-[12px] lg:flex-none"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <>
+                <LoaderCircle className="animate-spin" aria-hidden="true" />
+                Menyusun
+              </>
+            ) : (
+              "Buat listing"
+            )}
+          </Button>
+        </div>
       </div>
     </form>
   );

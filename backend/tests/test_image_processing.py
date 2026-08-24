@@ -1,9 +1,10 @@
 import io
 
 import pytest
+from PIL import Image
+
 from errors import ApiError
 from image_processing import process_image_bytes
-from PIL import Image
 
 
 def test_preprocessor_strips_metadata_converts_rgb_and_limits_dimensions() -> None:

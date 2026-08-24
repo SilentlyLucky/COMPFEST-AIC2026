@@ -9,9 +9,13 @@ import { ListingForm } from "./ListingForm";
 import { ListingResult } from "./ListingResult";
 import { StepProgress } from "./StepProgress";
 import { generateListing, ListingApiError } from "@/lib/listing-api";
-import type { CategoryCode, GenerateListingResponse } from "@/lib/listing-types";
+import type {
+  CategoryCode,
+  GenerateListingResponse,
+} from "@/lib/listing-types";
 import {
   INITIAL_FORM_VALUES,
+  firstInvalidField,
   validateImage,
   validateListing,
   type FieldErrors,
@@ -22,7 +26,24 @@ import {
 type WizardStep = 1 | 2 | 3;
 const PROCESSING_LIMIT_MS = 45_000;
 const CLIENT_ABORT_GRACE_MS = 2_000;
-const PROGRESS_MESSAGES = ["Memeriksa foto", "Menyusun listing", "Membandingkan harga"] as const;
+const PROGRESS_MESSAGES = [
+  "Memeriksa foto",
+  "Menyusun listing",
+  "Membandingkan harga",
+] as const;
+const DETAIL_FIELDS: ListingField[] = [
+  "productType",
+  "brand",
+  "variant",
+  "size",
+  "materialOrIngredients",
+];
+const PRICING_FIELDS: ListingField[] = [
+  "packagingCost",
+  "otherCost",
+  "targetMargin",
+  "platformFee",
+];
 
 const API_FIELD_MAP: Record<string, ListingField> = {
   image: "image",
@@ -43,36 +64,62 @@ const API_FIELD_MAP: Record<string, ListingField> = {
 function mapApiField(field: string | null): ListingField | null {
   if (!field) return null;
   const segment = field.split(".").at(-1);
-  return segment ? API_FIELD_MAP[segment] ?? null : null;
+  return segment ? (API_FIELD_MAP[segment] ?? null) : null;
 }
 
-function RequestError({ error, onRetry }: { error: ListingApiError; onRetry: () => void }) {
+function RequestError({
+  error,
+  onRetry,
+}: {
+  error: ListingApiError;
+  onRetry: () => void;
+}) {
+  const message =
+    error.code === "CLIENT_TIMEOUT" ||
+    error.code === "GENERATION_TIMEOUT" ||
+    error.status === 504
+      ? "Proses memerlukan waktu lebih lama dari biasanya. Coba lagi."
+      : error.code === "REQUEST_CANCELLED"
+        ? "Proses dibatalkan. Kamu bisa mencoba lagi saat siap."
+        : error.field
+          ? "Periksa isian yang ditandai, lalu coba lagi."
+          : error.retryable
+            ? "Belum bisa menyusun listing saat ini. Coba lagi sebentar."
+            : "Periksa kembali isianmu, lalu coba lagi.";
+
   return (
     <div
       role="alert"
-      className="rounded-[24px] border border-status-error bg-status-error-soft p-5 shadow-[0_16px_40px_rgba(180,35,24,0.08)] sm:p-6"
+      className="border-l-4 border-status-error bg-status-error-soft p-4 sm:p-5"
     >
       <div className="flex items-start gap-4">
-        <AlertCircle className="mt-1 size-6 shrink-0 text-status-error" aria-hidden="true" />
+        <AlertCircle
+          className="mt-1 size-6 shrink-0 text-status-error"
+          aria-hidden="true"
+        />
         <div className="min-w-0 flex-1">
-          <h2 className="font-semibold text-ink">Listing belum berhasil dibuat</h2>
-          <p className="mt-2 leading-7 text-ink">{error.message}</p>
-          <p className="mt-3 break-all font-mono text-xs leading-5 text-ink-muted">
-            Kode: {error.code}
-            {error.requestId ? ` · Request ID: ${error.requestId}` : ""}
+          <h2 className="font-semibold text-ink">
+            Listing belum berhasil dibuat
+          </h2>
+          <p className="mt-2 leading-7 text-ink">{message}</p>
+          <p className="mt-2 text-sm leading-6 text-ink-muted">
+            Drafmu tetap tersimpan.
           </p>
           {error.retryable ? (
-            <Button type="button" variant="outline" className="mt-4" onClick={onRetry}>
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-4"
+              onClick={onRetry}
+            >
               <RotateCcw aria-hidden="true" />
               Coba lagi
             </Button>
-          ) : (
+          ) : error.field ? (
             <p className="mt-4 text-sm font-medium text-ink">
-              {error.field
-                ? "Periksa kolom yang ditandai, lalu perbaiki isian sebelum mencoba lagi."
-                : "Periksa kembali isianmu sebelum mengirim permintaan lagi."}
+              Periksa isian yang ditandai sebelum mencoba lagi.
             </p>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
@@ -85,19 +132,31 @@ export function ListingWizard() {
   const [image, setImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [requestError, setRequestError] = useState<ListingApiError | null>(null);
-  const [response, setResponse] = useState<GenerateListingResponse | null>(null);
+  const [requestError, setRequestError] = useState<ListingApiError | null>(
+    null,
+  );
+  const [response, setResponse] = useState<GenerateListingResponse | null>(
+    null,
+  );
   const [categoryCode, setCategoryCode] = useState<CategoryCode | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [progressIndex, setProgressIndex] = useState(0);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [pricingOpen, setPricingOpen] = useState(false);
+  const [fieldToFocus, setFieldToFocus] = useState<ListingField | null>(null);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
   const previewUrlRef = useRef<string | null>(null);
   const stageHeadingRef = useRef<HTMLHeadingElement>(null);
+  const previousStepRef = useRef<WizardStep | null>(null);
 
   useEffect(() => {
-    stageHeadingRef.current?.focus();
+    if (previousStepRef.current !== null && previousStepRef.current !== step) {
+      stageHeadingRef.current?.focus();
+    }
+    previousStepRef.current = step;
   }, [step]);
 
   useEffect(() => {
@@ -109,10 +168,18 @@ export function ListingWizard() {
   }, [isSubmitting]);
 
   useEffect(() => {
-    const field = mapApiField(requestError?.field ?? null);
-    if (!field) return;
-    document.getElementById(field)?.focus();
-  }, [requestError]);
+    if (!fieldToFocus) return;
+    if (DETAIL_FIELDS.includes(fieldToFocus) && !detailsOpen) return;
+    if (PRICING_FIELDS.includes(fieldToFocus) && !pricingOpen) return;
+
+    const frameId = window.requestAnimationFrame(() => {
+      const control = document.getElementById(fieldToFocus);
+      control?.scrollIntoView({ block: "center" });
+      control?.focus({ preventScroll: true });
+      setFieldToFocus(null);
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [detailsOpen, fieldToFocus, pricingOpen]);
 
   useEffect(
     () => () => {
@@ -123,7 +190,9 @@ export function ListingWizard() {
   );
 
   function handleFieldChange(field: keyof ListingFormValues, value: string) {
-    setValues((current) => ({ ...current, [field]: value }) as ListingFormValues);
+    setValues(
+      (current) => ({ ...current, [field]: value }) as ListingFormValues,
+    );
     setErrors((current) => ({ ...current, [field]: undefined }));
     setRequestError(null);
   }
@@ -131,7 +200,8 @@ export function ListingWizard() {
   function handleImageChange(file: File | null) {
     const imageError = validateImage(file);
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
-    const nextPreviewUrl = file && !imageError ? URL.createObjectURL(file) : null;
+    const nextPreviewUrl =
+      file && !imageError ? URL.createObjectURL(file) : null;
     previewUrlRef.current = nextPreviewUrl;
     setPreviewUrl(nextPreviewUrl);
     setImage(file);
@@ -139,14 +209,21 @@ export function ListingWizard() {
     setRequestError(null);
   }
 
+  function focusField(field: ListingField) {
+    if (DETAIL_FIELDS.includes(field)) setDetailsOpen(true);
+    if (PRICING_FIELDS.includes(field)) setPricingOpen(true);
+    setFieldToFocus(field);
+  }
+
   async function submitListing(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
     const validation = validateListing(values, image);
+    setHasSubmitted(true);
     setErrors(validation.errors);
     setRequestError(null);
     if (!validation.metadata || !image) {
-      const firstField = Object.keys(validation.errors)[0];
-      if (firstField) document.getElementById(firstField)?.focus();
+      const firstField = firstInvalidField(validation.errors);
+      if (firstField) focusField(firstField);
       return;
     }
 
@@ -160,7 +237,11 @@ export function ListingWizard() {
     setIsSubmitting(true);
 
     try {
-      const result = await generateListing(image, validation.metadata, controller.signal);
+      const result = await generateListing(
+        image,
+        validation.metadata,
+        controller.signal,
+      );
       setResponse(result);
       setCategoryCode(result.data.listing.category.code);
       setTitle(result.data.listing.title);
@@ -194,7 +275,10 @@ export function ListingWizard() {
       }
 
       const field = mapApiField(nextError.field);
-      if (field) setErrors((current) => ({ ...current, [field]: nextError.message }));
+      if (field) {
+        setErrors((current) => ({ ...current, [field]: nextError.message }));
+        focusField(field);
+      }
       setRequestError(nextError);
     } finally {
       window.clearTimeout(timeoutId);
@@ -216,6 +300,10 @@ export function ListingWizard() {
     setCategoryCode(null);
     setTitle("");
     setDescription("");
+    setDetailsOpen(false);
+    setPricingOpen(false);
+    setFieldToFocus(null);
+    setHasSubmitted(false);
     setStep(1);
   }
 
@@ -227,20 +315,28 @@ export function ListingWizard() {
         <h1
           ref={stageHeadingRef}
           tabIndex={-1}
-          className="max-w-4xl text-balance text-[clamp(2rem,4vw,3rem)] font-semibold leading-[1.06] tracking-[-0.05em] text-ink focus:outline-2 focus:outline-offset-4 focus:outline-brand"
+          className="max-w-5xl text-balance text-[clamp(2rem,3.8vw,4rem)] font-semibold leading-[1.06] tracking-[-0.05em] text-ink focus:outline-2 focus:outline-offset-4 focus:outline-brand"
         >
           {step === 1 && "Ceritakan produkmu lewat foto dan fakta."}
           {step === 2 && "Periksa hasil dan tingkat keyakinannya."}
           {step === 3 && "Salin hasil ke kanal jualmu."}
         </h1>
         <p className="mt-4 max-w-3xl text-base leading-7 text-ink-muted sm:text-lg sm:leading-8">
-          {step === 1 && "Input tidak akan hilang saat backend belum siap atau permintaan perlu dicoba ulang."}
-          {step === 2 && "Edit judul dan deskripsi sebelum melanjutkan. Harga dan confidence dapat kosong bila bukti belum cukup."}
-          {step === 3 && "Gunakan hasil ini sebagai draf. Periksa kembali sebelum menerbitkannya di marketplace."}
+          {step === 1 &&
+            "Cukup isi yang benar-benar kamu tahu. LAPAKIN akan membantu menyusun sisanya."}
+          {step === 2 &&
+            "Edit judul dan deskripsi sebelum melanjutkan. Harga dan confidence dapat kosong bila bukti belum cukup."}
+          {step === 3 &&
+            "Gunakan hasil ini sebagai draf. Periksa kembali sebelum menerbitkannya di marketplace."}
         </p>
       </div>
 
-      {requestError && step === 1 && <RequestError error={requestError} onRetry={() => void submitListing()} />}
+      {requestError && step === 1 && (
+        <RequestError
+          error={requestError}
+          onRetry={() => void submitListing()}
+        />
+      )}
 
       {step === 1 && (
         <ListingForm
@@ -248,7 +344,14 @@ export function ListingWizard() {
           previewUrl={previewUrl}
           errors={errors}
           isSubmitting={isSubmitting}
-          progressMessage={isSubmitting ? PROGRESS_MESSAGES[progressIndex] : null}
+          progressMessage={
+            isSubmitting ? PROGRESS_MESSAGES[progressIndex] : null
+          }
+          detailsOpen={detailsOpen}
+          pricingOpen={pricingOpen}
+          hasSubmitError={hasSubmitted && Object.keys(errors).length > 0}
+          onDetailsOpenChange={setDetailsOpen}
+          onPricingOpenChange={setPricingOpen}
           onFieldChange={handleFieldChange}
           onImageChange={handleImageChange}
           onSubmit={submitListing}

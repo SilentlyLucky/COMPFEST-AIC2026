@@ -6,11 +6,12 @@ from pathlib import Path
 
 import main as main_module
 import pytest
+from ai.category import OpenClipCategoryClassifier
 from ai.listing import SulinganVlmGenerator
 from ai.pricing import CatalogPricingService
 from errors import ApiError
 from fastapi.testclient import TestClient
-from main import GenerationCapacity, app, get_services
+from main import GenerationCapacity, app, get_services, parse_cors_origins
 from PIL import Image
 from schemas import (
     CategoryCode,
@@ -29,6 +30,10 @@ TODAY = date(2026, 8, 23)
 class FakeGenerator:
     version = "generator-test-v1"
     calls = 0
+    warmup_calls = 0
+
+    async def warmup(self) -> None:
+        type(self).warmup_calls += 1
 
     def readiness(self) -> ServiceReadiness:
         return ServiceReadiness(ready=True)
@@ -50,7 +55,12 @@ class FakeGenerator:
 
 class FakeClassifier:
     version = "classifier-test-v1"
+    calibration_version = "catalog-test-cal-v1"
     calls = 0
+    warmup_calls = 0
+
+    async def warmup(self) -> None:
+        type(self).warmup_calls += 1
 
     def readiness(self) -> ServiceReadiness:
         return ServiceReadiness(ready=True)
@@ -69,6 +79,11 @@ class FakeClassifier:
 class FakeMarketService:
     version = "price-test-v1"
     data_version = "snapshot-test"
+    calibration_version = "catalog-test-cal-v1"
+    warmup_calls = 0
+
+    async def warmup(self) -> None:
+        type(self).warmup_calls += 1
 
     def readiness(self) -> ServiceReadiness:
         return ServiceReadiness(ready=True)
@@ -111,10 +126,18 @@ class FakeSlowGenerator(FakeGenerator):
         return await super().generate(image, metadata)
 
 
+class FakeFailingWarmupGenerator(FakeGenerator):
+    async def warmup(self) -> None:
+        raise RuntimeError("generator warmup failed")
+
+
 @pytest.fixture
 def client() -> TestClient:
     FakeGenerator.calls = 0
+    FakeGenerator.warmup_calls = 0
     FakeClassifier.calls = 0
+    FakeClassifier.warmup_calls = 0
+    FakeMarketService.warmup_calls = 0
     services = ListingServices(
         generator=FakeGenerator(),
         classifier=FakeClassifier(),
@@ -160,6 +183,7 @@ def test_generate_listing_accepts_valid_multipart_and_returns_real_contract(
     body = response.json()
     assert body["error"] is None
     assert body["meta"]["request_id"].startswith("req_")
+    assert body["meta"]["calibration_version"] == "catalog-test-cal-v1"
     assert body["data"]["listing"]["category"]["code"] == "camilan_olahan"
     assert body["data"]["listing"]["price"] == {
         "currency": "IDR",
@@ -184,6 +208,28 @@ def test_generate_listing_accepts_metadata_without_market_region_code(
 ) -> None:
     metadata = valid_metadata()
     metadata.pop("market_region_code")
+
+    response = client.post(
+        "/v1/listings/generate",
+        files={"image": ("product.png", make_image_bytes(), "image/png")},
+        data={"metadata": json.dumps(metadata)},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["error"] is None
+    assert FakeGenerator.calls == 1
+    assert FakeClassifier.calls == 1
+
+
+@pytest.mark.parametrize("product_type", ["missing", None, "   "])
+def test_generate_listing_accepts_missing_null_or_empty_product_type(
+    client: TestClient, product_type: str | None
+) -> None:
+    metadata = valid_metadata()
+    if product_type == "missing":
+        metadata.pop("product_type")
+    else:
+        metadata["product_type"] = product_type
 
     response = client.post(
         "/v1/listings/generate",
@@ -231,8 +277,11 @@ def test_invalid_metadata_json_is_a_400_envelope(client: TestClient) -> None:
     assert FakeClassifier.calls == 0
 
 
-def test_invalid_metadata_field_is_a_422_envelope(client: TestClient) -> None:
-    metadata = valid_metadata() | {"product_type": "x"}
+@pytest.mark.parametrize("product_type", ["x", "a" * 81])
+def test_invalid_product_type_hint_is_a_422_envelope(
+    client: TestClient, product_type: str
+) -> None:
+    metadata = valid_metadata() | {"product_type": product_type}
     response = client.post(
         "/v1/listings/generate",
         files={"image": ("product.png", make_image_bytes(), "image/png")},
@@ -321,17 +370,44 @@ def test_oversize_image_is_rejected_before_decode(client: TestClient) -> None:
     assert FakeClassifier.calls == 0
 
 
-def test_runtime_without_classifier_and_market_data_is_honestly_unavailable() -> None:
-    app.dependency_overrides.clear()
-    with TestClient(app) as test_client:
-        response = test_client.post(
-            "/v1/listings/generate",
-            files={"image": ("product.png", make_image_bytes(), "image/png")},
-            data={"metadata": json.dumps(valid_metadata())},
-        )
+def test_lifespan_warms_injected_services_before_serving() -> None:
+    FakeGenerator.warmup_calls = 0
+    FakeClassifier.warmup_calls = 0
+    FakeMarketService.warmup_calls = 0
+    services = ListingServices(
+        generator=FakeGenerator(),
+        classifier=FakeClassifier(),
+        market=FakeMarketService(),
+    )
+    app.dependency_overrides[get_services] = lambda: services
+    try:
+        assert FakeGenerator.warmup_calls == 0
+        with TestClient(app) as test_client:
+            assert test_client.get("/health/live").status_code == 200
+            assert FakeGenerator.warmup_calls == 1
+            assert FakeClassifier.warmup_calls == 1
+            assert FakeMarketService.warmup_calls == 1
+    finally:
+        app.dependency_overrides.clear()
 
-    assert response.status_code == 503
-    assert response.json()["error"]["code"] == "SERVICE_NOT_READY"
+
+def test_service_warmup_deduplicates_shared_catalog_instance() -> None:
+    class SharedCatalog:
+        warmup_calls = 0
+
+        async def warmup(self) -> None:
+            self.warmup_calls += 1
+
+    catalog = SharedCatalog()
+    services = ListingServices(
+        generator=FakeGenerator(),
+        classifier=catalog,
+        market=catalog,
+    )
+
+    asyncio.run(services.warmup())
+
+    assert catalog.warmup_calls == 1
 
 
 def test_readiness_reports_injected_service_state(client: TestClient) -> None:
@@ -342,24 +418,79 @@ def test_readiness_reports_injected_service_state(client: TestClient) -> None:
     assert all(item["ready"] for item in response.json()["services"].values())
 
 
-def test_default_readiness_is_503_without_required_runtime_services() -> None:
-    app.dependency_overrides.clear()
-    with TestClient(app) as test_client:
-        response = test_client.get("/health/ready")
+def test_lifespan_propagates_warmup_failure_and_never_serves() -> None:
+    services = ListingServices(
+        generator=FakeFailingWarmupGenerator(),
+        classifier=FakeClassifier(),
+        market=FakeMarketService(),
+    )
+    app.dependency_overrides[get_services] = lambda: services
+    try:
+        with (
+            pytest.raises(RuntimeError, match="generator warmup failed"),
+            TestClient(app),
+        ):
+            pytest.fail("startup failure must prevent the client from serving")
+    finally:
+        app.dependency_overrides.clear()
 
-    assert response.status_code == 503
-    assert response.json()["status"] == "not_ready"
-    assert response.json()["services"]["classifier"]["ready"] is False
-    assert response.json()["services"]["market"]["ready"] is False
-    assert "/home/" not in response.text
+
+def test_cors_origins_have_a_safe_localhost_default(monkeypatch) -> None:
+    monkeypatch.delenv(main_module.CORS_ALLOWED_ORIGINS_ENV, raising=False)
+
+    assert parse_cors_origins() == ("http://localhost:3000",)
+
+
+def test_cors_origins_parse_trim_normalize_and_deduplicate() -> None:
+    assert parse_cors_origins(
+        " https://lapakin.example/,http://localhost:3000,https://lapakin.example "
+    ) == ("https://lapakin.example", "http://localhost:3000")
+
+
+def test_cors_preflight_allows_localhost_and_rejects_other_origin(
+    client: TestClient,
+) -> None:
+    base_headers = {
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type",
+    }
+
+    allowed = client.options(
+        "/v1/listings/generate",
+        headers={**base_headers, "Origin": "http://localhost:3000"},
+    )
+    assert allowed.status_code == 200
+    assert allowed.headers["access-control-allow-origin"] == "http://localhost:3000"
+
+    rejected = client.options(
+        "/v1/listings/generate",
+        headers={**base_headers, "Origin": "http://127.0.0.1:3000"},
+    )
+    assert rejected.status_code == 400
+    assert "access-control-allow-origin" not in rejected.headers
+
+
+@pytest.mark.parametrize(
+    "raw_origins",
+    [
+        "*",
+        "lapakin.example",
+        "https://user:password@lapakin.example",
+        "https://lapakin.example/path",
+    ],
+)
+def test_cors_origins_reject_unsafe_or_non_origin_values(raw_origins: str) -> None:
+    with pytest.raises(RuntimeError, match="CORS_ALLOWED_ORIGINS"):
+        parse_cors_origins(raw_origins)
 
 
 def test_default_services_use_only_packaged_production_components() -> None:
     services = main_module.DEFAULT_SERVICES
 
     assert isinstance(services.generator, SulinganVlmGenerator)
-    assert isinstance(services.classifier, CatalogPricingService)
-    assert services.classifier is services.market
+    assert isinstance(services.classifier, OpenClipCategoryClassifier)
+    assert isinstance(services.market, CatalogPricingService)
+    assert services.classifier is not services.market
     assert main_module.ADAPTER_PATH.parent == (
         Path(__file__).parents[1] / "ai" / "listing"
     )

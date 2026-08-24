@@ -41,7 +41,9 @@ CATEGORY_LABELS: dict[CategoryCode, str] = {
 class ListingMetadata(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    product_type: str = Field(min_length=2, max_length=80, strict=True)
+    product_type: str | None = Field(
+        default=None, min_length=2, max_length=80, strict=True
+    )
     platform: Platform
     market_region_code: str | None = Field(
         default=None, pattern=r"^ID-[A-Z]{2}$", strict=True
@@ -57,6 +59,13 @@ class ListingMetadata(BaseModel):
     other_cost_idr: int = Field(default=0, ge=0, le=1_000_000_000, strict=True)
     target_margin_pct: Decimal = Field(default=Decimal(30), ge=0, le=80)
     platform_fee_pct: Decimal = Field(default=Decimal(0), ge=0, le=40)
+
+    @field_validator("product_type", mode="before")
+    @classmethod
+    def empty_product_type_becomes_none(cls, value: str | None) -> str | None:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @field_validator("brand", "variant", "size", "material_or_ingredients")
     @classmethod
@@ -122,8 +131,7 @@ class CopyCandidate(BaseModel):
 
 class CategoryPrediction(BaseModel):
     code: CategoryCode
-    # Retrieval voting supplies a category but is not a calibrated classifier.
-    # Keep confidence null until a held-out calibration artifact is published.
+    # Populated only by a matching held-out calibration artifact.
     score: int | None = Field(default=None, ge=0, le=100)
     evidence_terms: tuple[str, ...] = ()
 

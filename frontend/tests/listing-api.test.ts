@@ -4,7 +4,6 @@ import { generateListing, ListingApiError } from "../lib/listing-api";
 import type { GenerateListingResponse, ListingMetadata } from "../lib/listing-types";
 
 const metadata: ListingMetadata = {
-  product_type: "Keripik pisang",
   platform: "umum",
   market_region_code: "ID-JK",
   production_cost_idr: 25000,
@@ -67,7 +66,7 @@ afterEach(() => {
 });
 
 describe("listing API contract", () => {
-  it("sends multipart FormData without manually setting Content-Type and parses success", async () => {
+  it("sends multipart FormData without a blank product-type hint or manual Content-Type", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(successPayload));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -83,6 +82,17 @@ describe("listing API contract", () => {
     expect((body as FormData).get("metadata")).toBe(JSON.stringify(metadata));
     expect(result.meta.request_id).toBe("req_success");
     expect(result.data.listing.category.code).toBe("camilan_olahan");
+  });
+
+  it("preserves a supplied optional product-type hint in multipart metadata", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(successPayload));
+    vi.stubGlobal("fetch", fetchMock);
+    const metadataWithHint = { ...metadata, product_type: "Keripik pisang" };
+
+    await generateListing(image, metadataWithHint, new AbortController().signal);
+
+    const body = fetchMock.mock.calls[0]?.[1]?.body as FormData;
+    expect(body.get("metadata")).toBe(JSON.stringify(metadataWithHint));
   });
 
   it("maps server error request_id, field, and retryable values", async () => {

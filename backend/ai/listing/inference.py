@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import logging
 import threading
 from pathlib import Path
 from typing import Any, Final
@@ -36,6 +37,8 @@ REQUIRED_ASSETS: Final = (
     "tokenizer.json",
     "tokenizer_config.json",
 )
+
+logger = logging.getLogger(__name__)
 
 
 class _AdapterOutput(BaseModel):
@@ -99,8 +102,9 @@ class SulinganVlmGenerator:
             return await asyncio.to_thread(self._infer, image, metadata)
         except ApiError:
             raise
-        except Exception:  # noqa: BLE001 - translate third-party inference failures at the boundary.
-            self._load_error = "model inference failed"
+        except Exception as error:  # noqa: BLE001 - translate third-party inference failures at the boundary.
+            self._load_error = f"{type(error).__name__}: {error}"
+            logger.exception("Listing model inference failed")
             raise ApiError(
                 status_code=503,
                 code="MODEL_INFERENCE_FAILED",
@@ -143,6 +147,7 @@ class SulinganVlmGenerator:
                 **encoded,
                 max_new_tokens=220,
                 do_sample=False,
+                temperature=None,
             )
             prompt_length = encoded["input_ids"].shape[1]
             raw_output = self._processor.tokenizer.decode(
@@ -191,8 +196,9 @@ class SulinganVlmGenerator:
                 model = PeftModel.from_pretrained(
                     base_model, self._adapter_path
                 ).eval()
-            except Exception:  # noqa: BLE001 - model loaders expose heterogeneous failures.
-                self._load_error = "model initialization failed"
+            except Exception as error:  # noqa: BLE001 - model loaders expose heterogeneous failures.
+                self._load_error = f"{type(error).__name__}: {error}"
+                logger.exception("Listing model initialization failed")
                 raise ApiError(
                     status_code=503,
                     code="MODEL_LOAD_FAILED",

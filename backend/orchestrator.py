@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import inspect
 import re
 
@@ -55,9 +54,11 @@ class ListingOrchestrator:
                 details={"unavailable_services": unavailable},
             )
 
-        candidate, category = await asyncio.gather(
-            self._services.generator.generate(image, metadata),
-            self._services.classifier.classify(image, metadata),
+        candidate = await self._services.generator.generate(image, metadata)
+        category = await self._services.classifier.classify(
+            image,
+            metadata,
+            text_hint=_category_text_hint(candidate),
         )
         visual_query = _visual_query(candidate)
         catalog_pricer = getattr(
@@ -197,3 +198,8 @@ def _visual_query(candidate: CopyCandidate) -> str | None:
     ]
     query = " ".join(words)
     return query[:VISUAL_QUERY_MAX_CHARS].rstrip() or None
+
+
+def _category_text_hint(candidate: CopyCandidate) -> str:
+    """Expose generated copy to the multimodal category classifier as text."""
+    return f"judul listing: {candidate.title}. deskripsi listing: {candidate.description}"

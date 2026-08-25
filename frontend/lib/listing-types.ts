@@ -70,6 +70,12 @@ export interface MarketComparable {
 }
 
 export type PricingZone = "good" | "fair" | "tight" | "danger";
+export type RecommendationBasis =
+  | "market_median"
+  | "floor_plus_15_percent"
+  | "floor_plus_20_percent"
+  | "upper_quartile"
+  | "floor_above_market";
 
 export interface VariantPriceDetails {
   label: string;
@@ -92,6 +98,18 @@ export interface PricingDetails {
   minimum_price_idr: number;
   zone: PricingZone;
   margin_pct: number;
+  target_margin_pct: number;
+  net_margin_pct: number;
+  platform_commission_pct: number;
+  shipping_pct: number;
+  income_tax_pct: number;
+  processing_fee_idr: number;
+  market_p25_idr: number;
+  market_median_idr: number;
+  market_p75_idr: number;
+  market_quartiles_available: boolean;
+  market_confidence_score: number | null;
+  recommendation_basis: RecommendationBasis;
   cost_breakdown_idr: Record<string, number>;
   variant_prices: VariantPriceDetails[];
   suggested_variations: string[];

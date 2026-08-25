@@ -3,6 +3,7 @@ import io
 import json
 from datetime import date
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 from fastapi.testclient import TestClient
@@ -61,6 +62,7 @@ class FakeClassifier:
     calibration_version = "catalog-test-cal-v1"
     calls = 0
     warmup_calls = 0
+    text_hints: ClassVar[list[str | None]] = []
 
     async def warmup(self) -> None:
         type(self).warmup_calls += 1
@@ -69,9 +71,14 @@ class FakeClassifier:
         return ServiceReadiness(ready=True)
 
     async def classify(
-        self, image: ProcessedImage, metadata: ListingMetadata
+        self,
+        image: ProcessedImage,
+        metadata: ListingMetadata,
+        *,
+        text_hint: str | None = None,
     ) -> CategoryPrediction:
         type(self).calls += 1
+        type(self).text_hints.append(text_hint)
         return CategoryPrediction(
             code=CategoryCode.CAMILAN_OLAHAN,
             score=87,
@@ -203,6 +210,7 @@ def client() -> TestClient:
     FakeGenerator.warmup_calls = 0
     FakeClassifier.calls = 0
     FakeClassifier.warmup_calls = 0
+    FakeClassifier.text_hints.clear()
     FakeMarketService.warmup_calls = 0
     services = ListingServices(
         generator=FakeGenerator(),
@@ -267,6 +275,13 @@ def test_generate_listing_accepts_valid_multipart_and_returns_real_contract(
     assert body["data"]["confidence"]["overall"]["score"] == 76
     assert FakeGenerator.calls == 1
     assert FakeClassifier.calls == 1
+    assert FakeClassifier.text_hints == [
+        (
+            "judul listing: Keripik Pisang Renyah 250 g. deskripsi listing: "
+            "Keripik pisang ukuran 250 g untuk camilan sehari-hari. "
+            "Dikemas praktis untuk dinikmati bersama keluarga."
+        )
+    ]
 
 
 def test_generate_listing_accepts_metadata_without_market_region_code(
@@ -339,8 +354,8 @@ def test_generate_listing_returns_market_first_details_for_advanced_pricing() ->
     assert "PLATFORM_FEE_DEFAULTED" in body["warnings"]
 
 
-def test_catalog_market_first_keeps_no_pricing_response_shape_additive() -> None:
-    """Basic catalog users receive modern pricing without an unexpected details field."""
+def test_catalog_market_first_exposes_pricing_explainability_for_basic_users() -> None:
+    """Basic catalog users can understand the recommendation without advanced inputs."""
     market = FakeCatalogMarketFirstService()
     services = ListingServices(
         generator=FakeGenerator(),
@@ -361,16 +376,11 @@ def test_catalog_market_first_keeps_no_pricing_response_shape_additive() -> None
 
     assert response.status_code == 200
     body = response.json()
-    assert set(body["data"]["listing"]["price"]) == {
-        "currency",
-        "recommended",
-        "market_interval",
-        "viable_floor",
-        "alignment",
-        "comparable_count",
-        "data_as_of",
-    }
-    assert body["data"]["listing"]["price"]["recommended"] == 24_900
+    price = body["data"]["listing"]["price"]
+    assert price["recommended"] == 24_900
+    assert price["pricing_details"]["sale_unit"] == "pcs"
+    assert price["pricing_details"]["target_margin_pct"] == 30.0
+    assert price["pricing_details"]["recommendation_basis"] == "market_median"
     assert body["meta"]["price_model_version"] == "market-first-catalog-v1"
     assert "PLATFORM_FEE_NOT_PROVIDED" in body["data"]["warnings"]
     assert "PLATFORM_FEE_DEFAULTED" not in body["data"]["warnings"]

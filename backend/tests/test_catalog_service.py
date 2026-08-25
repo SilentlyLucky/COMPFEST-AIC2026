@@ -251,12 +251,12 @@ def test_catalog_market_first_reuses_one_async_retrieval(tmp_path, monkeypatch) 
     assert calls == 1
     assert result.pricing_details is not None
     assert result.pricing_details.suggested_variations == [
-        "Comparable titles show flavor variants; consider flavor options."
+        "Produk serupa memiliki beberapa pilihan rasa. Pertimbangkan menambahkan variasi rasa."
     ]
 
 
-def test_catalog_market_first_omits_details_without_advanced_pricing(tmp_path) -> None:
-    """The real catalog uses new tiers for all users while keeping the old response shape."""
+def test_catalog_market_first_explains_details_without_advanced_pricing(tmp_path) -> None:
+    """The real catalog explains the new tiers even when only basic costs are supplied."""
     dataset_path, manifest_path = write_catalog(tmp_path)
     service = CatalogPricingService(dataset_path, manifest_path, min_score=0.0)
 
@@ -265,7 +265,9 @@ def test_catalog_market_first_omits_details_without_advanced_pricing(tmp_path) -
     )
 
     assert result.recommended is not None
-    assert result.pricing_details is None
+    assert result.pricing_details is not None
+    assert result.pricing_details.sale_unit == "pcs"
+    assert result.pricing_details.target_margin_pct == 30.0
     assert result.warnings == ()
     assert [item.title for item in result.comparable_preview] == [
         "Keripik pisang renyah original camilan 0",
@@ -448,7 +450,8 @@ def test_orchestrator_real_catalog_keeps_legacy_shopee_floor_without_pricing(
     class Classifier:
         version = "test-classifier"
 
-        async def classify(self, image, metadata):
+        async def classify(self, image, metadata, *, text_hint=None):
+            del text_hint
             return CategoryPrediction(code=CategoryCode.CAMILAN_OLAHAN)
 
         def readiness(self) -> ServiceReadiness:
@@ -471,7 +474,8 @@ def test_orchestrator_real_catalog_keeps_legacy_shopee_floor_without_pricing(
     )
 
     assert result.data.listing.price.recommended is not None
-    assert result.data.listing.price.pricing_details is None
+    assert result.data.listing.price.pricing_details is not None
+    assert result.data.listing.price.pricing_details.sale_unit == "pcs"
     assert "PLATFORM_FEE_NOT_PROVIDED" in result.data.warnings
 
 

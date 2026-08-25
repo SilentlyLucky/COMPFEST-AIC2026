@@ -103,7 +103,7 @@ export async function generateListing(
   } catch (error) {
     if (signal.aborted) throw error;
     throw new ListingApiError(
-      "Tidak dapat terhubung ke backend LAPAKIN. Pastikan API sedang berjalan.",
+      "Tidak dapat terhubung ke layanan LAPAKIN. Pastikan layanan sedang berjalan.",
       0,
       "NETWORK_ERROR",
       null,
@@ -140,7 +140,7 @@ export async function generateListing(
 
   if (!isSuccessPayload(payload)) {
     throw new ListingApiError(
-      "Respons backend tidak memiliki struktur yang diharapkan.",
+      "Jawaban dari layanan LAPAKIN tidak memiliki informasi yang diharapkan.",
       500,
       "INVALID_RESPONSE",
       null,

@@ -299,9 +299,13 @@ class CatalogPricingService:
         await asyncio.to_thread(self._ensure_loaded)
 
     async def classify(
-        self, image: ProcessedImage, metadata: ListingMetadata
+        self,
+        image: ProcessedImage,
+        metadata: ListingMetadata,
+        *,
+        text_hint: str | None = None,
     ) -> CategoryPrediction:
-        del image
+        del image, text_hint
         try:
             neighbors = await asyncio.to_thread(self._retrieve, metadata)
         except ApiError:

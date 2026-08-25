@@ -1,0 +1,7 @@
+{
+  "data_version": "market-catalog-v1-train-20260821-4a846315",
+  "data_as_of": "2026-08-13",
+  "row_count": 21589,
+  "source_split": "dataset/splits/v1/train/records.jsonl",
+  "sha256": "4a8463158fb3dbe25dc0a113026ec9ac9e23efdaa3235a662435b34c5a7653e9"
+}

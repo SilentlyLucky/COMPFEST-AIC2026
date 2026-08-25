@@ -71,11 +71,18 @@ def test_market_first_converts_total_hpp_and_defaults_marketplace_tariff() -> No
     assert result.pricing_details is not None
     assert result.pricing_details.hpp_per_unit_idr == 11_000
     assert result.pricing_details.sale_unit == "bag"
+    assert result.pricing_details.target_margin_pct == 30.0
+    assert result.pricing_details.platform_commission_pct == 5.75
+    assert result.pricing_details.processing_fee_idr == 1_250
+    assert result.pricing_details.market_median_idr == 25_000
+    assert result.pricing_details.recommendation_basis == "market_median"
+    assert result.pricing_details.net_margin_pct > 0
+    assert "Batas aman" in result.pricing_details.explanation
     assert result.pricing_details.variant_prices[1].hpp_per_unit_idr == 20_000
     assert result.pricing_details.suggested_variations == [
-        "Comparable titles show color variants; consider a color option.",
-        "Comparable titles show weight or content variants; consider separate content options.",
-        "Comparable titles show flavor variants; consider flavor options.",
+        "Produk serupa memiliki beberapa pilihan warna. Pertimbangkan menambahkan variasi warna.",
+        "Produk serupa memiliki beberapa pilihan berat atau isi. Pertimbangkan menambahkan variasi tersebut.",
+        "Produk serupa memiliki beberapa pilihan rasa. Pertimbangkan menambahkan variasi rasa.",
     ]
     assert "PLATFORM_FEE_DEFAULTED" in result.warnings
 
@@ -126,17 +133,44 @@ def test_market_first_defaults_sale_unit_to_pcs() -> None:
     assert result.pricing_details.sale_unit == "pcs"
 
 
+def test_market_first_explains_basic_pricing_without_advanced_inputs() -> None:
+    """Basic users receive the same cost and market explanation as advanced users."""
+    metadata = ListingMetadata(
+        platform="umum", production_cost_idr=12_000, target_margin_pct=30
+    )
+    evidence = MarketEvidence(
+        median=25_000,
+        low=23_000,
+        high=28_000,
+        comparable_count=30,
+        data_as_of=TODAY,
+    )
+
+    result = price_with_market_first(metadata, "camilan_olahan", evidence)
+
+    assert result.pricing_details is not None
+    assert result.pricing_details.sale_unit == "pcs"
+    assert result.pricing_details.hpp_per_unit_idr == 12_000
+    assert result.pricing_details.recommendation_basis == "market_median"
+    assert result.pricing_details.market_quartiles_available is False
+
+
 @pytest.mark.parametrize(
-    ("floor", "zone", "recommended", "aggressive", "premium"),
+    ("floor", "zone", "recommended", "aggressive", "premium", "basis"),
     [
-        (5_000, "good", 19_900, 9_900, 19_900),
-        (15_000, "fair", 19_900, 15_900, 32_900),
-        (25_000, "tight", 28_900, 27_900, 32_900),
-        (32_000, "danger", 32_900, 32_900, 32_900),
+        (5_000, "good", 19_900, 9_900, 19_900, "market_median"),
+        (15_000, "fair", 19_900, 15_900, 32_900, "market_median"),
+        (25_000, "tight", 28_900, 27_900, 32_900, "floor_plus_15_percent"),
+        (32_000, "danger", 32_900, 32_900, 32_900, "floor_above_market"),
     ],
 )
 def test_market_first_uses_model_harga_zone_tiers_with_hard_floor(
-    floor: int, zone: str, recommended: int, aggressive: int, premium: int
+    floor: int,
+    zone: str,
+    recommended: int,
+    aggressive: int,
+    premium: int,
+    basis: str,
 ) -> None:
     """Tier options follow market-first zones but never drop below the safety floor."""
     evidence = MarketEvidence(
@@ -155,6 +189,7 @@ def test_market_first_uses_model_harga_zone_tiers_with_hard_floor(
         aggressive,
         premium,
     )
+    assert tiers.recommendation_basis == basis
     assert min(tiers.recommended, tiers.aggressive, tiers.premium) >= floor
     assert tiers.aggressive <= tiers.recommended <= tiers.premium
 
@@ -246,11 +281,11 @@ def test_grade_prices_distinguish_estimated_markup_from_explicit_hpp() -> None:
 
     assert result.pricing_details is not None
     regular, premium = result.pricing_details.variant_prices
-    assert regular.note == "seller-provided HPP"
+    assert regular.note == "Modal diambil dari data yang kamu masukkan."
     assert regular.hpp_per_unit_idr == 10_000
     assert regular.recommended_price_idr == 19_900
     assert regular.margin_pct == 99.0
-    assert premium.note.startswith("estimated price factor 1.50")
+    assert premium.note == "Perkiraan untuk kualitas ini; modal dasar tetap digunakan."
     assert premium.hpp_per_unit_idr == 10_000
     assert premium.recommended_price_idr == 29_900
     assert premium.margin_pct == 199.0
@@ -281,7 +316,7 @@ def test_explicit_grade_hpp_uses_unscaled_market_tiers() -> None:
 
     assert result.pricing_details is not None
     premium = result.pricing_details.variant_prices[0]
-    assert premium.note == "seller-provided HPP"
+    assert premium.note == "Modal diambil dari data yang kamu masukkan."
     assert premium.hpp_per_unit_idr == 20_000
     assert premium.recommended_price_idr == 29_900
     assert premium.margin_pct == 49.5
@@ -334,7 +369,7 @@ def test_market_first_applies_tokopedia_commission_cap_to_high_price_floor() -> 
                 "Keripik Pisang Renyah",
                 "Keripik Pisang Pilihan",
             ),
-            ["Comparable titles show flavor variants; consider flavor options."],
+            ["Produk serupa memiliki beberapa pilihan rasa. Pertimbangkan menambahkan variasi rasa."],
         ),
     ],
 )

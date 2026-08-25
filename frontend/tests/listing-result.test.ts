@@ -98,14 +98,26 @@ describe("listing result seller-facing states", () => {
       "utf8",
     );
 
-    expect(source).toContain("Detail teknis hasil");
-    expect(source).toContain("Lihat rincian perhitungan harga");
-    expect(source).toContain("Belum ada cukup produk pembanding");
-    expect(source).toContain("Contoh produk pembanding dari katalog");
+    expect(source).toContain("Saran variasi produk");
+    expect(source).toContain("Lihat alasan harga ini");
+    expect(source).toContain("Kenapa harga ini?");
+    expect(source).toContain("Posisi harga terhadap pasar");
+    expect(source).toContain("Rentang umum P25–P75");
+    expect(source).toContain("formatRupiah(marketLower)");
+    expect(source).toContain("Selisih dari modal");
+    expect(source).toContain("Perkiraan keuntungan bersih");
+    expect(source).toContain("P25 (Persentil)");
+    expect(source).toContain("P75 (Persentil)");
+    expect(source).toContain("Keterangan titik harga");
+    expect(source).toContain("Belum ada cukup produk serupa");
+    expect(source).toContain("Contoh produk serupa");
     expect(source).toContain("MARKET_SUBTYPE_COMPARABLES_INSUFFICIENT");
     expect(source).toContain("MARKET_ATTRIBUTE_COMPARABLES_INSUFFICIENT");
     expect(source).toContain("Tinjau & salin");
     expect(source).not.toContain("Metode:");
-    expect(source).toContain('className="group self-start rounded-[24px]');
+    expect(source).not.toContain("backend");
+    expect(source).not.toContain("Mesin perhitungan");
+    expect(source).not.toContain("Informasi hasil");
+    expect(source).not.toContain('className="group self-start rounded-[24px]');
   });
 });

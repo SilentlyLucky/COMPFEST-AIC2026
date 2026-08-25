@@ -126,29 +126,29 @@ _VARIATION_PATTERNS = (
             r"\b(hitam|putih|merah|biru|hijau|kuning|coklat|cokelat|abu|navy|maroon|pink|ungu|krem|gold|silver|tosca|mocca|warna)\b",
             re.IGNORECASE,
         ),
-        "Comparable titles show color variants; consider a color option.",
+        "Produk serupa memiliki beberapa pilihan warna. Pertimbangkan menambahkan variasi warna.",
     ),
     (
         re.compile(
             r"\b(all\s?size|allsize|ukuran|size|xs|xl|xxl|2xl|3xl|4xl|5xl)\b",
             re.IGNORECASE,
         ),
-        "Comparable titles show size variants; consider size options.",
+        "Produk serupa memiliki beberapa pilihan ukuran. Pertimbangkan menambahkan variasi ukuran.",
     ),
     (
         re.compile(
             r"\b\d+(?:[.,]\d+)?\s*(kg|gr|gram|g|ml|liter|lt|l)\b",
             re.IGNORECASE,
         ),
-        "Comparable titles show weight or content variants; consider separate content options.",
+        "Produk serupa memiliki beberapa pilihan berat atau isi. Pertimbangkan menambahkan variasi tersebut.",
     ),
     (
         re.compile(r"\b(rasa|varian rasa|flavor)\b", re.IGNORECASE),
-        "Comparable titles show flavor variants; consider flavor options.",
+        "Produk serupa memiliki beberapa pilihan rasa. Pertimbangkan menambahkan variasi rasa.",
     ),
     (
         re.compile(r"\b\d+\s*(gb|tb)\b", re.IGNORECASE),
-        "Comparable titles show capacity variants; consider capacity options.",
+        "Produk serupa memiliki beberapa pilihan kapasitas. Pertimbangkan menambahkan variasi kapasitas.",
     ),
 )
 _GRADE_FACTORS = {
@@ -178,6 +178,7 @@ class _TierPrices:
     recommended: int
     aggressive: int
     premium: int
+    recommendation_basis: str
 
 
 def price_with_market_first(
@@ -224,9 +225,12 @@ def price_with_market_first(
     breakdown = _breakdown(
         tiers.recommended, hpp_per_unit, tariff, annual_turnover, vat_registered
     )
-    details = None
+    sale_unit = (
+        metadata.pricing.output_unit_label
+        if metadata.pricing and metadata.pricing.output_unit_label
+        else "pcs"
+    )
     if metadata.pricing is not None:
-        sale_unit = metadata.pricing.output_unit_label or "pcs"
         variants, suggestions = _variant_prices(
             metadata,
             category.value if isinstance(category, CategoryCode) else str(category),
@@ -237,28 +241,51 @@ def price_with_market_first(
             annual_turnover,
             vat_registered,
         )
-        suggestions = _catalog_variation_suggestions(comparable_titles, suggestions)
-        explanation = (
-            f"Market evidence from {evidence.comparable_count} comparable listings sets the "
-            f"reference range at IDR {evidence.low:,} to IDR {evidence.high:,}. "
-            f"The recommended IDR {tiers.recommended:,} per {sale_unit} stays above the "
-            f"IDR {viable_floor:,} safety floor based on HPP, marketplace costs, and "
-            f"the requested target margin."
-        )
-        details = PriceDetails(
-            hpp_per_unit_idr=hpp_per_unit,
-            sale_unit=sale_unit,
-            aggressive_price_idr=tiers.aggressive,
-            premium_price_idr=tiers.premium,
-            minimum_price_idr=viable_floor,
-            zone=tiers.zone,
-            margin_pct=_margin_pct(tiers.recommended, hpp_per_unit),
-            cost_breakdown_idr=breakdown,
-            variant_prices=variants,
-            suggested_variations=suggestions,
-            explanation=explanation,
-            engine_version=ENGINE_VERSION,
-        )
+    else:
+        variants, suggestions = [], []
+    suggestions = _catalog_variation_suggestions(comparable_titles, suggestions)
+    income_tax_pct = _deductions_pct(annual_turnover, vat_registered)
+    explanation = _pricing_explanation(
+        recommended=tiers.recommended,
+        sale_unit=sale_unit,
+        floor=viable_floor,
+        hpp=hpp_per_unit,
+        evidence=evidence,
+        basis=tiers.recommendation_basis,
+        target_margin_pct=metadata.target_margin_pct,
+        tariff=tariff,
+        income_tax_pct=income_tax_pct,
+    )
+    details = PriceDetails(
+        hpp_per_unit_idr=hpp_per_unit,
+        sale_unit=sale_unit,
+        aggressive_price_idr=tiers.aggressive,
+        premium_price_idr=tiers.premium,
+        minimum_price_idr=viable_floor,
+        zone=tiers.zone,
+        margin_pct=_margin_pct(tiers.recommended, hpp_per_unit),
+        target_margin_pct=float(metadata.target_margin_pct),
+        net_margin_pct=float(
+            _net_margin_pct(tiers.recommended, breakdown["net_profit"])
+        ),
+        platform_commission_pct=float(tariff.commission_pct),
+        shipping_pct=float(tariff.shipping_pct),
+        income_tax_pct=float(income_tax_pct),
+        processing_fee_idr=tariff.processing_idr,
+        market_p25_idr=evidence.p25 or evidence.low,
+        market_median_idr=evidence.p50 or evidence.median,
+        market_p75_idr=evidence.p75 or evidence.high,
+        market_quartiles_available=(
+            evidence.p25 is not None and evidence.p75 is not None
+        ),
+        market_confidence_score=evidence.confidence_score,
+        recommendation_basis=tiers.recommendation_basis,
+        cost_breakdown_idr=breakdown,
+        variant_prices=variants,
+        suggested_variations=suggestions,
+        explanation=explanation,
+        engine_version=ENGINE_VERSION,
+    )
     return aligned.model_copy(
         update={
             "recommended": tiers.recommended,
@@ -272,6 +299,47 @@ def price_with_market_first(
             "pricing_details": details,
         }
     )
+
+
+def _pricing_explanation(
+    *,
+    recommended: int,
+    sale_unit: str,
+    floor: int,
+    hpp: int,
+    evidence: MarketEvidence,
+    basis: str,
+    target_margin_pct: Decimal,
+    tariff: _Tariff,
+    income_tax_pct: Decimal,
+) -> str:
+    basis_copy = {
+        "market_median": "mengikuti median pasar setelah melewati batas aman",
+        "floor_plus_15_percent": "memberi ruang sekitar 15% di atas batas aman",
+        "floor_plus_20_percent": "memberi ruang sekitar 20% di atas batas aman",
+        "upper_quartile": "mendekati kuartil atas karena batas aman sudah tinggi",
+        "floor_above_market": "memprioritaskan batas aman karena biaya berada di atas pasar",
+    }.get(basis, "menggabungkan batas aman dan acuan pasar")
+    return (
+        f"{_format_idr(recommended)} per {sale_unit} dipilih karena {basis_copy}. "
+        f"Batas aman {_format_idr(floor)} dihitung dari modal {_format_idr(hpp)}, "
+        f"biaya layanan {_format_pct(tariff.commission_pct)}%, biaya proses "
+        f"{_format_idr(tariff.processing_idr)}, biaya kirim "
+        f"{_format_pct(tariff.shipping_pct)}%, pajak {_format_pct(income_tax_pct)}%, "
+        f"dan target keuntungan {_format_pct(target_margin_pct)}%. "
+        f"Kami membandingkan {evidence.comparable_count} produk serupa: harga tengah "
+        f"{_format_idr(evidence.p50 or evidence.median)}, kisaran "
+        f"{_format_idr(evidence.low)}–{_format_idr(evidence.high)}."
+    )
+
+
+def _format_idr(value: int) -> str:
+    return f"Rp{value:,}".replace(",", ".")
+
+
+def _format_pct(value: Decimal | float) -> str:
+    formatted = f"{float(value):.1f}".rstrip("0").rstrip(".")
+    return formatted.replace(".", ",")
 
 
 def _hpp_per_unit(metadata: ListingMetadata) -> int:
@@ -433,17 +501,30 @@ def _tier_prices(floor: int, evidence: MarketEvidence) -> _TierPrices:
     upper_quartile = evidence.p75 or evidence.high
     quartile_median = evidence.p50 or evidence.median
     zone = _zone(floor, evidence)
-    if zone == "danger":
+    if floor > evidence.high:
+        recommendation_basis = "floor_above_market"
+        recommended_base = upper_quartile
+    elif zone == "danger":
+        recommendation_basis = "upper_quartile"
         recommended_base = upper_quartile
     elif zone == "tight":
-        recommended_base = min(
-            max(_percent_of(floor, "1.15"), quartile_median), upper_quartile
+        floor_target = _percent_of(floor, "1.15")
+        recommendation_basis = (
+            "floor_plus_15_percent"
+            if floor_target >= quartile_median
+            else "market_median"
         )
+        recommended_base = min(max(floor_target, quartile_median), upper_quartile)
     elif zone == "fair":
-        recommended_base = min(
-            max(quartile_median, _percent_of(floor, "1.20")), upper_quartile
+        floor_target = _percent_of(floor, "1.20")
+        recommendation_basis = (
+            "floor_plus_20_percent"
+            if floor_target >= quartile_median
+            else "market_median"
         )
+        recommended_base = min(max(quartile_median, floor_target), upper_quartile)
     else:
+        recommendation_basis = "market_median"
         recommended_base = quartile_median
     aggressive_base = max(lower_quartile, _percent_of(floor, "1.10"))
     premium_base = min(_percent_of(upper_quartile, "1.10"), _percent_of(floor, "2.5"))
@@ -456,6 +537,7 @@ def _tier_prices(floor: int, evidence: MarketEvidence) -> _TierPrices:
         recommended=recommended,
         aggressive=aggressive,
         premium=premium,
+        recommendation_basis=recommendation_basis,
     )
 
 
@@ -488,6 +570,12 @@ def _margin_pct(price: int, hpp: int) -> Decimal:
     return (Decimal(price - hpp) * Decimal(100) / Decimal(hpp)).quantize(Decimal("0.1"))
 
 
+def _net_margin_pct(price: int, net_profit: int) -> Decimal:
+    return (Decimal(net_profit) * Decimal(100) / Decimal(price)).quantize(
+        Decimal("0.1")
+    )
+
+
 def _variant_prices(
     metadata,
     category: str,
@@ -515,7 +603,7 @@ def _variant_prices(
                     metadata.target_margin_pct,
                     annual_turnover,
                     vat_registered,
-                    "same price as the base unit",
+                    "Harga sama dengan unit utama.",
                     base_tiers,
                 )
             )
@@ -530,9 +618,9 @@ def _variant_prices(
             )
             hpp = explicit or max(1, int(Decimal(base_hpp) * factor))
             note = (
-                "seller-provided HPP"
+                "Modal diambil dari data yang kamu masukkan."
                 if explicit
-                else f"estimated from size factor {factor:.2f}"
+                else "Perkiraan dari perbedaan ukuran."
             )
             variants.append(
                 _variant(
@@ -553,14 +641,14 @@ def _variant_prices(
         for label in options.grades:
             explicit = (options.hpp_per_grade_idr or {}).get(label)
             if explicit:
-                hpp, note = explicit, "seller-provided HPP"
+                hpp, note = explicit, "Modal diambil dari data yang kamu masukkan."
                 grade_evidence = evidence
                 estimated_tiers = None
             else:
                 factor = Decimal(str(grade_factors.get(label.casefold(), 1.0)))
                 hpp, note, grade_evidence, estimated_tiers = (
                     base_hpp,
-                    f"estimated price factor {factor:.2f}; HPP is unchanged",
+                    "Perkiraan untuk kualitas ini; modal dasar tetap digunakan.",
                     evidence,
                     _scaled_tiers(base_tiers, factor, base_tiers.minimum),
                 )
@@ -643,6 +731,7 @@ def _scaled_tiers(tiers: _TierPrices, factor: Decimal, floor: int) -> _TierPrice
             _round_at_least(int(tiers.aggressive * factor), floor), recommended
         ),
         premium=max(_round_at_least(int(tiers.premium * factor), floor), recommended),
+        recommendation_basis=tiers.recommendation_basis,
     )
 
 

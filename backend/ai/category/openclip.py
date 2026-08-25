@@ -37,13 +37,56 @@ MODEL_ROOT = BACKEND_ROOT / "ai" / "category" / "model"
 DEFAULT_ARTIFACT_PATH = MODEL_ROOT / "category_heads.pt"
 DEFAULT_ENCODER_PATH = MODEL_ROOT / "openclip_vit_b32_laion2b_s34b_b79k.safetensors"
 
-CATEGORY_MODEL_VERSION: Final = "openclip-hybrid-category-v1"
+CATEGORY_MODEL_VERSION: Final = "openclip-hybrid-category-v3"
 CALIBRATION_VERSION: Final = "openclip-hybrid-category-cal-v1"
 MODEL_NAME: Final = "ViT-B-32"
 EXPECTED_EMBEDDING_DIM: Final = 512
+COPY_TEXT_WEIGHT: Final = 0.5
+COPY_TEXT_MAX_CHARS: Final = 360
+ZERO_SHOT_TEMPERATURE: Final = 0.05
+ZERO_SHOT_BLEND_WEIGHT: Final = 0.7
+COPY_ZERO_SHOT_WEIGHT: Final = 0.5
 REQUIRED_MODULES: Final = ("torch", "open_clip")
 CATEGORY_MODEL_PATH_ENV: Final = "LAPAKIN_CATEGORY_MODEL_PATH"
 CATEGORY_ENCODER_PATH_ENV: Final = "LAPAKIN_CATEGORY_ENCODER_PATH"
+
+CATEGORY_PROMPTS: Final[dict[CategoryCode, tuple[str, ...]]] = {
+    CategoryCode.BUMBU_MASAK: (
+        "a photo of cooking spices or seasoning",
+        "bumbu masak",
+    ),
+    CategoryCode.CAMILAN_OLAHAN: (
+        "a photo of packaged snack food",
+        "chips or crackers",
+        "camilan olahan",
+    ),
+    CategoryCode.FASHION_PERAWATAN: (
+        "a photo of a fashion tote bag",
+        "a batik tote bag",
+        "a handbag or clothing accessory",
+        "tas fashion",
+        "tas tote batik",
+    ),
+    CategoryCode.KRIYA_RUMAH: (
+        "a rattan basket for home storage",
+        "a household craft product",
+        "home decor and storage basket",
+        "keranjang rotan untuk rumah",
+        "kriya rumah",
+    ),
+    CategoryCode.LAINNYA: (
+        "a miscellaneous marketplace product",
+        "produk lainnya",
+    ),
+    CategoryCode.MINUMAN_HERBAL: (
+        "a photo of an herbal drink",
+        "minuman herbal",
+    ),
+    CategoryCode.POKOK_TANI: (
+        "an agricultural product",
+        "produk hasil tani",
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -92,6 +135,26 @@ def build_category_fact_text(metadata: ListingMetadata) -> str:
 
 def _normalize(features: Any) -> Any:
     return features / features.norm(dim=-1, keepdim=True).clamp_min(1e-12)
+
+
+def _build_category_prompt_features(
+    torch: Any,
+    model: Any,
+    tokenizer: Any,
+    classes: tuple[CategoryCode, ...],
+    device: str,
+) -> Any:
+    prompt_texts = [prompt for category in classes for prompt in CATEGORY_PROMPTS[category]]
+    prompt_tokens = tokenizer(prompt_texts).to(device)
+    with torch.inference_mode():
+        prompt_features = _normalize(model.encode_text(prompt_tokens)).float()
+        centroids = []
+        offset = 0
+        for category in classes:
+            count = len(CATEGORY_PROMPTS[category])
+            centroids.append(_normalize(prompt_features[offset : offset + count].mean(0, keepdim=True))[0])
+            offset += count
+    return torch.stack(centroids)
 
 
 def _finite_positive(value: object) -> float:
@@ -178,6 +241,7 @@ class OpenClipCategoryClassifier:
         self._text_temperature = 1.0
         self._hybrid_alpha = 0.0
         self._hybrid_temperature = 1.0
+        self._category_prompt_features: Any = None
         self._device = "cpu"
         self._load_error: str | None = None
 
@@ -218,7 +282,11 @@ class OpenClipCategoryClassifier:
         await asyncio.to_thread(self._load)
 
     async def classify(
-        self, image: ProcessedImage, metadata: ListingMetadata
+        self,
+        image: ProcessedImage,
+        metadata: ListingMetadata,
+        *,
+        text_hint: str | None = None,
     ) -> CategoryPrediction:
         status = self.readiness()
         if not status.ready and not status.startable:
@@ -229,7 +297,7 @@ class OpenClipCategoryClassifier:
                 retryable=True,
             )
         try:
-            return await asyncio.to_thread(self._infer, image, metadata)
+            return await asyncio.to_thread(self._infer, image, metadata, text_hint)
         except ApiError:
             raise
         except Exception:  # noqa: BLE001 - translate inference failures at the API boundary.
@@ -279,6 +347,13 @@ class OpenClipCategoryClassifier:
                 model.eval().requires_grad_(False)
                 image_head.to(device).eval()
                 text_head.to(device).eval()
+                category_prompt_features = _build_category_prompt_features(
+                    torch,
+                    model,
+                    tokenizer,
+                    artifact.classes,
+                    device,
+                )
             except Exception:  # noqa: BLE001 - third-party loaders are heterogeneous.
                 self._load_error = "category model initialization failed"
                 raise ApiError(
@@ -299,28 +374,72 @@ class OpenClipCategoryClassifier:
             self._text_temperature = artifact.text_temperature
             self._hybrid_alpha = artifact.hybrid_alpha
             self._hybrid_temperature = artifact.hybrid_temperature
+            self._category_prompt_features = category_prompt_features
             self._device = device
 
     def _infer(
-        self, image: ProcessedImage, metadata: ListingMetadata
+        self,
+        image: ProcessedImage,
+        metadata: ListingMetadata,
+        text_hint: str | None = None,
     ) -> CategoryPrediction:
         self._load()
         fact_text = build_category_fact_text(metadata)
+        copy_text = _clean(text_hint)[:COPY_TEXT_MAX_CHARS]
         with self._inference_lock, self._torch.inference_mode():
             image_tensor = self._preprocess(image.image).unsqueeze(0).to(self._device)
             image_features = _normalize(self._model.encode_image(image_tensor))
             image_logits = self._image_head(image_features).float()
             logits = image_logits
             temperature = self._image_temperature
+            zero_shot_scores = (
+                image_features @ self._category_prompt_features.T
+                if self._category_prompt_features is not None
+                else None
+            )
 
-            if fact_text:
-                text_tensor = self._tokenizer([fact_text]).to(self._device)
+            text_inputs = [text for text in (fact_text, copy_text) if text]
+            if text_inputs:
+                text_tensor = self._tokenizer(text_inputs).to(self._device)
                 text_features = _normalize(self._model.encode_text(text_tensor))
                 text_logits = self._text_head(text_features).float()
-                logits = image_logits + self._hybrid_alpha * text_logits
+                logits = image_logits.clone()
+                if fact_text:
+                    logits = logits + self._hybrid_alpha * text_logits[:1]
+                    if zero_shot_scores is not None:
+                        zero_shot_scores = zero_shot_scores + (
+                            text_features[:1] @ self._category_prompt_features.T
+                        )
+                if copy_text:
+                    copy_index = 1 if fact_text else 0
+                    logits = (
+                        logits
+                        + self._hybrid_alpha
+                        * COPY_TEXT_WEIGHT
+                        * text_logits[copy_index : copy_index + 1]
+                    )
+                    if zero_shot_scores is not None:
+                        zero_shot_scores = zero_shot_scores + (
+                            COPY_ZERO_SHOT_WEIGHT
+                            * (
+                                text_features[copy_index : copy_index + 1]
+                                @ self._category_prompt_features.T
+                            )
+                        )
                 temperature = self._hybrid_temperature
 
-            probabilities = self._torch.softmax(logits / temperature, dim=-1)[0]
+            head_probabilities = self._torch.softmax(logits / temperature, dim=-1)
+            if zero_shot_scores is not None:
+                zero_shot_probabilities = self._torch.softmax(
+                    zero_shot_scores / ZERO_SHOT_TEMPERATURE,
+                    dim=-1,
+                )
+                probabilities = (
+                    ZERO_SHOT_BLEND_WEIGHT * zero_shot_probabilities
+                    + (1 - ZERO_SHOT_BLEND_WEIGHT) * head_probabilities
+                )[0]
+            else:
+                probabilities = head_probabilities[0]
             winner = int(probabilities.argmax().item())
             score = round(float(probabilities[winner].item()) * 100)
 

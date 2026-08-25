@@ -35,7 +35,11 @@ class CategoryClassifier(Protocol):
     def readiness(self) -> ServiceReadiness: ...
 
     async def classify(
-        self, image: ProcessedImage, metadata: ListingMetadata
+        self,
+        image: ProcessedImage,
+        metadata: ListingMetadata,
+        *,
+        text_hint: str | None = None,
     ) -> CategoryPrediction: ...
 
 
@@ -91,8 +95,13 @@ class UnavailableCategoryClassifier:
         )
 
     async def classify(
-        self, image: ProcessedImage, metadata: ListingMetadata
+        self,
+        image: ProcessedImage,
+        metadata: ListingMetadata,
+        *,
+        text_hint: str | None = None,
     ) -> CategoryPrediction:
+        del text_hint
         raise _unavailable_error("category classifier")
 
 

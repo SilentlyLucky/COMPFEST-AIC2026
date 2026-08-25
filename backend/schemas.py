@@ -415,6 +415,24 @@ class PriceDetails(BaseModel):
     minimum_price_idr: int = Field(gt=0)
     zone: Literal["good", "fair", "tight", "danger"]
     margin_pct: float
+    target_margin_pct: float = Field(ge=0, le=95)
+    net_margin_pct: float
+    platform_commission_pct: float = Field(ge=0, le=100)
+    shipping_pct: float = Field(ge=0, le=100)
+    income_tax_pct: float = Field(ge=0, le=100)
+    processing_fee_idr: int = Field(ge=0)
+    market_p25_idr: int = Field(gt=0)
+    market_median_idr: int = Field(gt=0)
+    market_p75_idr: int = Field(gt=0)
+    market_quartiles_available: bool
+    market_confidence_score: int | None = Field(default=None, ge=0, le=100)
+    recommendation_basis: Literal[
+        "market_median",
+        "floor_plus_15_percent",
+        "floor_plus_20_percent",
+        "upper_quartile",
+        "floor_above_market",
+    ]
     cost_breakdown_idr: dict[str, int]
     variant_prices: list[VariantPriceDetails] = Field(default_factory=list)
     suggested_variations: list[str] = Field(default_factory=list)

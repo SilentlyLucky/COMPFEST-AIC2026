@@ -13,7 +13,7 @@ const STEPS = [
 export function StepProgress({ currentStep }: { currentStep: 1 | 2 | 3 }) {
   return (
     <nav aria-label="Tahap pembuatan listing">
-      <ol className="hidden items-center md:flex">
+      <ol className="mx-auto hidden w-full max-w-4xl translate-x-24 translate-y-4 items-center justify-center md:flex">
         {STEPS.map(({ label, description, icon: Icon }, index) => {
           const number = index + 1;
           const active = number === currentStep;

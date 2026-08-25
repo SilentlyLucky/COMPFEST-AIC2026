@@ -7,7 +7,7 @@ cd -- "$BACKEND_DIR"
 
 PYTHON_BIN="${PYTHON_BIN:-$BACKEND_DIR/.venv/bin/python}"
 HOST="${HOST:-0.0.0.0}"
-PORT="${PORT:-8000}"
+PORT="${PORT:-8012}"
 RELOAD="${RELOAD:-0}"
 WORKERS="${WORKERS:-1}"
 

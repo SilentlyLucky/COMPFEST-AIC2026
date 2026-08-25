@@ -13,7 +13,7 @@ describe("Next API rewrite", () => {
     expect(await nextConfig.rewrites?.()).toEqual([
       {
         source: "/v1/:path*",
-        destination: "http://127.0.0.1:8000/v1/:path*",
+        destination: "http://127.0.0.1:8012/v1/:path*",
       },
     ]);
   });

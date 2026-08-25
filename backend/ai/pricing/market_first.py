@@ -15,7 +15,7 @@ from decimal import ROUND_CEILING, Decimal
 from itertools import pairwise
 
 try:
-    from pricing import align_market_price, calculate_viable_floor
+    from pricing import align_market_price
     from schemas import (
         CategoryCode,
         ListingMetadata,
@@ -26,7 +26,7 @@ try:
         VariantPriceDetails,
     )
 except ModuleNotFoundError:  # Allow import through backend.ai.pricing at repo root.
-    from backend.pricing import align_market_price, calculate_viable_floor
+    from backend.pricing import align_market_price
     from backend.schemas import (
         CategoryCode,
         ListingMetadata,
@@ -40,6 +40,8 @@ except ModuleNotFoundError:  # Allow import through backend.ai.pricing at repo r
 LOGGER = logging.getLogger(__name__)
 ENGINE_VERSION = "market-first-catalog-v1"
 CATALOG_VARIATION_MINIMUM_PERCENT = 20
+UMKM_TAX_FREE_TURNOVER_IDR = 500_000_000
+UMKM_FINAL_TAX_MAX_TURNOVER_IDR = 4_800_000_000
 
 _CATEGORY_TARIFF = {
     "bumbu_masak": "makanan_minuman",
@@ -71,7 +73,9 @@ _PLATFORM_TARIFFS = {
             "kriya_rumah": Decimal(10),
             "lainnya": Decimal(9),
         },
-        "shipping": Decimal(6),
+        # Program ongkir is optional and seller/program dependent; it is not
+        # included in the baseline estimate.
+        "shipping": Decimal(0),
         "processing": 1_250,
         "commission_cap": None,
     },
@@ -186,15 +190,21 @@ def price_with_market_first(
     """Return legacy-compatible top-level pricing plus optional rich details."""
     hpp_per_unit = _hpp_per_unit(metadata)
     if metadata.pricing is None:
-        tariff = _Tariff(metadata.platform_fee_pct, Decimal(0), 0, None, False)
-        tariff_warnings: tuple[str, ...] = ()
-        viable_floor = calculate_viable_floor(
+        # Platform fees must still be applied for the simple form path. The
+        # category is predicted from the image before this function runs, so
+        # sellers do not need to guess a fee themselves.
+        tariff, tariff_warnings = _tariff(metadata, category)
+        viable_floor = _minimum_price(
             metadata.total_cost_idr,
-            metadata.platform_fee_pct,
+            tariff,
             metadata.target_margin_pct,
+            0,
+            False,
         )
     else:
         tariff, tariff_warnings = _tariff(metadata, category)
+        if metadata.pricing.annual_turnover_idr > UMKM_FINAL_TAX_MAX_TURNOVER_IDR:
+            tariff_warnings = (*tariff_warnings, "PPh_FINAL_NOT_APPLIED_OVER_4_8B")
         viable_floor = _minimum_price(
             hpp_per_unit,
             tariff,
@@ -341,9 +351,20 @@ def _tariff(
     )
 
 
-def _deductions_pct(annual_turnover: int, vat_registered: bool) -> Decimal:
-    deductions = Decimal("0.5") if annual_turnover >= 500_000_000 else Decimal(0)
-    return deductions + (Decimal(11) if vat_registered else Decimal(0))
+def _deductions_pct(annual_turnover: int, _vat_registered: bool) -> Decimal:
+    """Return seller-side PPh estimate, not buyer-collected PPN.
+
+    PP 20/2026 keeps the 0.5% UMKM final rate and exempts the first
+    Rp500 million of an eligible individual taxpayer's annual turnover. The
+    estimate applies the rate only once the supplied turnover is above that
+    threshold. PPN is deliberately excluded because it is not a seller cost
+    when charged to the buyer.
+    """
+    return (
+        Decimal("0.5")
+        if UMKM_TAX_FREE_TURNOVER_IDR < annual_turnover <= UMKM_FINAL_TAX_MAX_TURNOVER_IDR
+        else Decimal(0)
+    )
 
 
 def _minimum_price(
@@ -443,7 +464,7 @@ def _percent_of(value: int, multiplier: str) -> int:
 
 
 def _breakdown(
-    price: int, hpp: int, tariff: _Tariff, annual_turnover: int, vat_registered: bool
+    price: int, hpp: int, tariff: _Tariff, annual_turnover: int, _vat_registered: bool
 ) -> dict[str, int]:
     commission = min(
         int(Decimal(price) * tariff.commission_pct / Decimal(100)),
@@ -452,15 +473,13 @@ def _breakdown(
     shipping = int(Decimal(price) * tariff.shipping_pct / Decimal(100))
     tax_pct = _deductions_pct(annual_turnover, False)
     tax = int(Decimal(price) * tax_pct / Decimal(100))
-    vat = int(Decimal(price) * Decimal(11) / Decimal(100)) if vat_registered else 0
-    profit = price - hpp - commission - shipping - tariff.processing_idr - tax - vat
+    profit = price - hpp - commission - shipping - tariff.processing_idr - tax
     return {
         "hpp": hpp,
         "platform_commission": commission,
         "shipping_program": shipping,
         "processing_fee": tariff.processing_idr,
         "income_tax": tax,
-        "vat": vat,
         "net_profit": profit,
     }
 

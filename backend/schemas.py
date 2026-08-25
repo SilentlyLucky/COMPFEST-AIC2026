@@ -49,9 +49,11 @@ CATEGORY_LABELS: dict[CategoryCode, str] = {
 
 _MASS_UNITS = frozenset({"g", "gr", "gram", "kg"})
 _VOLUME_UNITS = frozenset({"ml", "l", "lt", "liter"})
+_UMKM_TAX_FREE_TURNOVER_IDR = 500_000_000
+_UMKM_FINAL_TAX_MAX_TURNOVER_IDR = 4_800_000_000
 _DEFAULT_PLATFORM_DEDUCTIONS: dict[Platform, tuple[Decimal, Decimal]] = {
     Platform.TOKOPEDIA: (Decimal(8), Decimal(0)),
-    Platform.SHOPEE: (Decimal(10), Decimal(6)),
+    Platform.SHOPEE: (Decimal(10), Decimal(0)),
     Platform.BLIBLI: (Decimal(10), Decimal(0)),
     Platform.UMUM: (Decimal(0), Decimal(0)),
 }
@@ -133,10 +135,17 @@ class ListingMetadata(BaseModel):
             else default_commission
         )
         annual_turnover = pricing.annual_turnover_idr
-        vat = pricing.vat_registered
-        tax = Decimal("0.5") if annual_turnover >= 500_000_000 else Decimal(0)
+        # PPh UMKM is based on turnover, while PPN is normally collected from
+        # the buyer and should not be treated as a seller cost here.
+        tax = (
+            Decimal("0.5")
+            if _UMKM_TAX_FREE_TURNOVER_IDR
+            < annual_turnover
+            <= _UMKM_FINAL_TAX_MAX_TURNOVER_IDR
+            else Decimal(0)
+        )
         effective_deductions = (
-            target_margin + commission + shipping + tax + (Decimal(11) if vat else 0)
+            target_margin + commission + shipping + tax
         )
         if effective_deductions >= Decimal(95):
             raise ValueError(
@@ -177,6 +186,8 @@ class PricingOptions(BaseModel):
     output_unit_label: str | None = Field(
         default=None, min_length=1, max_length=32, strict=True
     )
+    # These optional variant fields remain accepted for older API clients. The
+    # current listing form intentionally does not collect them.
     colors: list[str] = Field(default_factory=list, max_length=12)
     sizes: list[str] = Field(default_factory=list, max_length=12)
     hpp_per_size_idr: dict[str, StrictInt] | None = Field(default=None, max_length=12)

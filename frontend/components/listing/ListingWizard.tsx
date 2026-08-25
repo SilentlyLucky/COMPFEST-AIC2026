@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { AlertCircle, RotateCcw } from "lucide-react";
+import { ArrowLeft, RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { CopyListing } from "./CopyListing";
 import { ListingForm } from "./ListingForm";
 import { ListingResult } from "./ListingResult";
 import { StepProgress } from "./StepProgress";
+import { Notification, NotificationViewport } from "../ui/notification";
 import { generateListing, ListingApiError } from "@/lib/listing-api";
 import type {
   CategoryCode,
@@ -26,6 +27,7 @@ import {
 type WizardStep = 1 | 2 | 3;
 const PROCESSING_LIMIT_MS = 45_000;
 const CLIENT_ABORT_GRACE_MS = 2_000;
+const LISTING_DRAFT_STORAGE_KEY = "lapakin:buat-listing:draft";
 const PROGRESS_MESSAGES = [
   "Memeriksa foto",
   "Menyusun listing",
@@ -157,9 +159,11 @@ export function mapApiErrorFields(
 function RequestError({
   error,
   onRetry,
+  onBack,
 }: {
   error: ListingApiError;
   onRetry: () => void;
+  onBack: () => void;
 }) {
   const message =
     error.code === "CLIENT_TIMEOUT" ||
@@ -176,38 +180,44 @@ function RequestError({
 
   return (
     <div
-      role="alert"
-      className="border-l-4 border-status-error bg-status-error-soft p-4 sm:p-5"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 p-4 backdrop-blur-[2px]"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onBack();
+      }}
     >
-      <div className="flex items-start gap-4">
-        <AlertCircle
-          className="mt-1 size-6 shrink-0 text-status-error"
-          aria-hidden="true"
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Gagal membuat listing"
+        className="w-full max-w-lg rounded-3xl border border-white/70 bg-white p-6 shadow-2xl motion-safe:animate-[notification-in_240ms_ease-out] sm:p-7"
+      >
+        <Notification
+          variant="error"
+          title="Listing belum berhasil dibuat"
+          message={message}
+          showAccent={false}
+          className="max-w-none border-0 bg-transparent p-0 shadow-none backdrop-blur-none"
         />
-        <div className="min-w-0 flex-1">
-          <h2 className="font-semibold text-ink">
-            Listing belum berhasil dibuat
-          </h2>
-          <p className="mt-2 leading-7 text-ink">{message}</p>
-          <p className="mt-2 text-sm leading-6 text-ink-muted">
-            Drafmu tetap tersimpan.
-          </p>
-          {error.retryable ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="mt-4"
-              onClick={onRetry}
-            >
+        <p className="mt-4 text-sm leading-6 text-ink-muted">
+          Drafmu tetap tersimpan.
+        </p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          {error.retryable && (
+            <Button type="button" variant="outline" onClick={onRetry}>
               <RotateCcw aria-hidden="true" />
               Coba lagi
             </Button>
-          ) : error.field ? (
-            <p className="mt-4 text-sm font-medium text-ink">
-              Periksa isian yang ditandai sebelum mencoba lagi.
-            </p>
-          ) : null}
+          )}
+          <Button type="button" variant="outline" onClick={onBack}>
+            <ArrowLeft aria-hidden="true" />
+            Kembali
+          </Button>
         </div>
+        {error.field && (
+          <p className="mt-4 text-sm font-medium text-ink">
+            Periksa isian yang ditandai sebelum mencoba lagi.
+          </p>
+        )}
       </div>
     </div>
   );
@@ -234,10 +244,56 @@ export function ListingWizard() {
   const [pricingOpen, setPricingOpen] = useState(false);
   const [fieldToFocus, setFieldToFocus] = useState<ListingField | null>(null);
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [isDraftReady, setIsDraftReady] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
   const previewUrlRef = useRef<string | null>(null);
   const stageHeadingRef = useRef<HTMLHeadingElement>(null);
   const previousStepRef = useRef<WizardStep | null>(null);
+
+  useEffect(() => {
+    try {
+      const storedDraft = window.localStorage.getItem(LISTING_DRAFT_STORAGE_KEY);
+      if (storedDraft) {
+        const parsedDraft = JSON.parse(storedDraft) as Partial<ListingFormValues>;
+        // Restore browser-owned draft state once after hydration.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setValues((current) => ({ ...current, ...parsedDraft }));
+      }
+    } catch {
+      // Ignore malformed or unavailable browser storage and keep a fresh form.
+    } finally {
+      setIsDraftReady(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isDraftReady) return;
+    try {
+      if (step !== 1) {
+        window.localStorage.removeItem(LISTING_DRAFT_STORAGE_KEY);
+        return;
+      }
+      window.localStorage.setItem(
+        LISTING_DRAFT_STORAGE_KEY,
+        JSON.stringify(values),
+      );
+    } catch {
+      // Draft persistence is best effort when browser storage is unavailable.
+    }
+  }, [isDraftReady, step, values]);
+
+  function saveDraft(nextValues: ListingFormValues) {
+    try {
+      window.localStorage.setItem(
+        LISTING_DRAFT_STORAGE_KEY,
+        JSON.stringify(nextValues),
+      );
+    } catch {
+      // Draft persistence is best effort when browser storage is unavailable.
+    }
+  }
 
   useEffect(() => {
     if (previousStepRef.current !== null && previousStepRef.current !== step) {
@@ -277,9 +333,11 @@ export function ListingWizard() {
   );
 
   function handleFieldChange(field: keyof ListingFormValues, value: string) {
-    setValues(
-      (current) => ({ ...current, [field]: value }) as ListingFormValues,
-    );
+    setValues((current) => {
+      const nextValues = { ...current, [field]: value } as ListingFormValues;
+      saveDraft(nextValues);
+      return nextValues;
+    });
     setErrors((current) => ({ ...current, [field]: undefined }));
     setRequestError(null);
   }
@@ -382,6 +440,8 @@ export function ListingWizard() {
 
   function restart() {
     controllerRef.current?.abort("restart");
+    setConfirmDelete(false);
+    setShowDeleteSuccess(true);
     setValues(INITIAL_FORM_VALUES);
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     previewUrlRef.current = null;
@@ -398,7 +458,10 @@ export function ListingWizard() {
     setFieldToFocus(null);
     setHasSubmitted(false);
     setStep(1);
+    window.localStorage.removeItem(LISTING_DRAFT_STORAGE_KEY);
   }
+
+  function confirmRestart() { setConfirmDelete(true); }
 
   return (
     <div className="space-y-8 md:space-y-10">
@@ -408,26 +471,29 @@ export function ListingWizard() {
         <h1
           ref={stageHeadingRef}
           tabIndex={-1}
-          className={`max-w-5xl text-balance font-semibold leading-[1.06] tracking-[-0.05em] text-ink focus:outline-2 focus:outline-offset-4 focus:outline-brand ${step === 2 ? "text-[clamp(2rem,3.8vw,3rem)]" : "text-[clamp(2rem,3.8vw,4rem)]"}`}
+          className={`max-w-none font-semibold leading-[1.06] tracking-[-0.05em] text-ink focus:outline-2 focus:outline-offset-4 focus:outline-brand md:whitespace-nowrap ${step === 2 ? "text-[clamp(2rem,3.8vw,3rem)]" : "text-[clamp(2rem,3.8vw,4rem)]"}`}
         >
-          {step === 1 && "Ceritakan produkmu lewat foto dan fakta."}
+          {step === 1 && "Ceritakan produkmu lewat foto dan data!"}
           {step === 2 && "Periksa hasil listing"}
           {step === 3 && "Salin hasil ke kanal jualmu."}
         </h1>
-        <p className="mt-4 max-w-3xl text-base leading-7 text-ink-muted sm:text-lg sm:leading-8">
-          {step === 1 &&
-            "Cukup isi yang benar-benar kamu tahu. LAPAKIN akan membantu menyusun sisanya."}
-          {step === 2 &&
-            "Tinjau hasil AI dan ubah jika diperlukan sebelum melanjutkan."}
-          {step === 3 &&
-            "Gunakan hasil ini sebagai draf. Periksa kembali sebelum menerbitkannya di marketplace."}
-        </p>
+        <div className="mt-4">
+          <p className="max-w-3xl text-base leading-7 text-ink-muted sm:text-lg sm:leading-8">
+            {step === 1 &&
+              "Cukup isi yang benar-benar kamu tahu. LAPAKIN akan membantu menyusun sisanya."}
+            {step === 2 &&
+              "Tinjau hasil AI dan ubah jika diperlukan sebelum melanjutkan."}
+            {step === 3 &&
+              "Gunakan hasil ini sebagai draf. Periksa kembali sebelum menerbitkannya di marketplace."}
+          </p>
+        </div>
       </div>
 
       {requestError && step === 1 && (
         <RequestError
           error={requestError}
           onRetry={() => void submitListing()}
+          onBack={() => setRequestError(null)}
         />
       )}
 
@@ -442,14 +508,51 @@ export function ListingWizard() {
           }
           detailsOpen={detailsOpen}
           pricingOpen={pricingOpen}
-          hasSubmitError={hasSubmitted && Object.keys(errors).length > 0}
           onDetailsOpenChange={setDetailsOpen}
           onPricingOpenChange={setPricingOpen}
           onFieldChange={handleFieldChange}
           onImageChange={handleImageChange}
           onSubmit={submitListing}
           onCancel={() => controllerRef.current?.abort("cancelled")}
+          onDeleteDraft={confirmRestart}
         />
+      )}
+      <NotificationViewport>
+        {showDeleteSuccess && (
+          <Notification
+            variant="success"
+            title="Draft berhasil dihapus"
+            message="Semua isian draft sudah dikosongkan."
+            autoDismissMs={5000}
+            onDismiss={() => setShowDeleteSuccess(false)}
+          />
+        )}
+        {hasSubmitted && Object.keys(errors).length > 0 && !requestError && (
+          <Notification
+            variant="warning"
+            title="Masih ada yang perlu dilengkapi"
+            message="Lengkapi bagian yang ditandai untuk melanjutkan."
+            autoDismissMs={5000}
+            onDismiss={() => setHasSubmitted(false)}
+          />
+        )}
+      </NotificationViewport>
+      {confirmDelete && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 p-4 backdrop-blur-[2px]"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setConfirmDelete(false);
+          }}
+        >
+          <div role="dialog" aria-modal="true" aria-label="Konfirmasi hapus draft" className="w-full max-w-md rounded-3xl border border-white/70 bg-white p-6 shadow-2xl motion-safe:animate-[notification-in_240ms_ease-out]">
+            <Notification variant="warning" title="Hapus draft ini?" message="Semua isian akan dikosongkan dan tidak dapat dipulihkan." />
+            <div className="mt-5 flex justify-end gap-3">
+              <Button type="button" variant="outline" onClick={() => setConfirmDelete(false)}>Batal</Button>
+              <Button type="button" variant="destructive" onClick={restart}>Hapus draft</Button>
+            </div>
+          </div>
+        </div>
       )}
       {step === 2 && response && (
         <ListingResult

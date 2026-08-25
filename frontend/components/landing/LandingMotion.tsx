@@ -42,20 +42,23 @@ export function LandingMotion({ children }: { children: ReactNode }) {
         );
         gsap.utils
           .toArray<HTMLElement>("[data-process-image]")
-          .forEach((image) =>
+          .forEach((image) => {
+            const isModelImage = image.hasAttribute("data-model-process-image");
             gsap.from(image, {
               y: 20,
+              x: isModelImage ? -56 : 0,
               opacity: 0.86,
-              scale: 0.99,
+              scale: isModelImage ? 0.76 : 0.99,
+              transformOrigin: isModelImage ? "16% 50%" : "50% 50%",
               ease: "none",
               scrollTrigger: {
                 trigger: image,
                 start: "top 88%",
-                end: "top 58%",
+                end: isModelImage ? "top 42%" : "top 58%",
                 scrub: 0.45,
               },
-            }),
-          );
+            });
+          });
         gsap.utils.toArray<SVGPathElement>("[data-draw-line]").forEach((line) =>
           gsap.from(line, {
             strokeDashoffset: 1,

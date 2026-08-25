@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Menu, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -34,15 +35,16 @@ export function LandingNavigation() {
       >
         <Link
           href="/"
-          className="inline-flex min-h-11 items-center gap-3 font-semibold tracking-[-.04em] text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-link"
+          className="inline-flex min-h-11 items-center focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-link"
         >
-          <span
-            aria-hidden="true"
-            className="grid size-8 place-items-center bg-ink text-sm text-white"
-          >
-            L
-          </span>
-          LAPAKIN
+          <Image
+            src="/images/Logo_LAPAKIN.png"
+            alt="LAPAKIN"
+            width={412}
+            height={374}
+            priority
+            className="h-14 w-auto object-contain"
+          />
         </Link>
         <div className="hidden items-center gap-7 md:flex">
           {links.map((link) => (

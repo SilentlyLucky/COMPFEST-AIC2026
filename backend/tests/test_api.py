@@ -759,13 +759,13 @@ def test_lifespan_propagates_warmup_failure_and_never_serves() -> None:
 def test_cors_origins_have_a_safe_localhost_default(monkeypatch) -> None:
     monkeypatch.delenv(main_module.CORS_ALLOWED_ORIGINS_ENV, raising=False)
 
-    assert parse_cors_origins() == ("http://localhost:3000",)
+    assert parse_cors_origins() == ("http://localhost:3012",)
 
 
 def test_cors_origins_parse_trim_normalize_and_deduplicate() -> None:
     assert parse_cors_origins(
-        " https://lapakin.example/,http://localhost:3000,https://lapakin.example "
-    ) == ("https://lapakin.example", "http://localhost:3000")
+        " https://lapakin.example/,http://localhost:3012,https://lapakin.example "
+    ) == ("https://lapakin.example", "http://localhost:3012")
 
 
 def test_cors_preflight_allows_localhost_and_rejects_other_origin(
@@ -778,14 +778,14 @@ def test_cors_preflight_allows_localhost_and_rejects_other_origin(
 
     allowed = client.options(
         "/v1/listings/generate",
-        headers={**base_headers, "Origin": "http://localhost:3000"},
+        headers={**base_headers, "Origin": "http://localhost:3012"},
     )
     assert allowed.status_code == 200
-    assert allowed.headers["access-control-allow-origin"] == "http://localhost:3000"
+    assert allowed.headers["access-control-allow-origin"] == "http://localhost:3012"
 
     rejected = client.options(
         "/v1/listings/generate",
-        headers={**base_headers, "Origin": "http://127.0.0.1:3000"},
+        headers={**base_headers, "Origin": "http://127.0.0.1:3012"},
     )
     assert rejected.status_code == 400
     assert "access-control-allow-origin" not in rejected.headers

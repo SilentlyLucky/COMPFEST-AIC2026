@@ -11,22 +11,27 @@ const assets = [
   {
     path: "/assets/lapakin/hero/lapakin-hero-ai.svg",
     minimumDesktopWidth: 602,
+    transparentArtboard: true,
   },
   {
     path: "/assets/lapakin/process/01-full-pipeline.svg",
     minimumDesktopWidth: 840,
+    transparentArtboard: false,
   },
   {
     path: "/assets/lapakin/process/02-input.svg",
     minimumDesktopWidth: 800,
+    transparentArtboard: false,
   },
   {
     path: "/assets/lapakin/process/03-ai-models.svg",
     minimumDesktopWidth: 856,
+    transparentArtboard: false,
   },
   {
     path: "/assets/lapakin/process/04-output.svg",
     minimumDesktopWidth: 800,
+    transparentArtboard: false,
   },
 ] as const;
 
@@ -161,8 +166,10 @@ describe("LAPAKIN landing SVG readability and motion", () => {
       const artboardBackgrounds = whiteRects.filter((rect) => (
         rect.x === x && rect.y === y && rect.width === width && rect.height === height
       ));
-      expect(artboardBackgrounds, `${asset.path} must have one exact artboard background`)
-        .toHaveLength(1);
+      expect(
+        artboardBackgrounds,
+        `${asset.path} artboard background transparency must match its contract`,
+      ).toHaveLength(asset.transparentArtboard ? 0 : 1);
       for (const rect of whiteRects) {
         if (artboardBackgrounds.includes(rect)) continue;
         expect(Math.min(
@@ -230,7 +237,7 @@ describe("LAPAKIN landing SVG readability and motion", () => {
 
     expect(output).not.toContain("Hasil yang siap kamu edit dan gunakan");
     expect(output).not.toContain(
-      "Satu listing lengkap dengan harga rekomendasi, interval pasar, dan confidence.",
+      "Satu listing lengkap dengan harga rekomendasi, dan confidence.",
     );
   });
 });

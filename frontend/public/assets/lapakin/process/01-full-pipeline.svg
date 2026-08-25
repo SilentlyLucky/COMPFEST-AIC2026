@@ -147,7 +147,7 @@
   <circle cx="600" cy="330" r="79" fill="#FFFFFF" stroke="#2A89CD" stroke-width="4"/>
   <circle cx="600" cy="330" r="57" fill="#FFF1D8"/>
   <circle cx="600" cy="330" r="37" fill="#F99404"/>
-  <text x="600" y="339" text-anchor="middle" class="t" fill="#00295D" font-size="26" font-weight="800">AI</text>
+  <text x="600" y="339" text-anchor="middle" class="t" fill="#FFFFFF" font-size="26" font-weight="800">AI</text>
 </g>
 <circle class="anim" cx="600" cy="330" r="57" fill="none" stroke="#F99404" stroke-width="3" opacity="0">
   <animate attributeName="r" dur="7.4s" repeatCount="indefinite" values="57;57;57;66;76;57" keyTimes="0;.2189;.2627;.3211;.3784;1"/>
@@ -237,7 +237,7 @@
     INTERVAL HARGA
     <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite" values="0;0;0;0;1;1" keyTimes="0;.5400;.5838;.6130;.6422;1"/>
   </text>
-  <text x="1080" y="466" class="t" fill="#fff" font-size="14.5" font-weight="700" opacity="0">
+  <text x="1100" y="466" class="t" fill="#fff" font-size="14.5" font-weight="700" opacity="0">
     Rp48.000–Rp78.000
     <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite" values="0;0;0;0;1;1" keyTimes="0;.5546;.5984;.6276;.6568;1"/>
   </text>

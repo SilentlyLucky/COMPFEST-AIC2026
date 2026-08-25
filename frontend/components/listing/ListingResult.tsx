@@ -48,7 +48,9 @@ const WARNING_MESSAGES: Record<string, string> = {
   PLATFORM_FEE_NOT_PROVIDED:
     "Biaya platform belum diisi, jadi harga belum memperhitungkan potongan platform.",
   PLATFORM_FEE_DEFAULTED:
-    "Biaya platform diisi 0%, jadi tarif platform terbaru untuk marketplace ini dipakai otomatis.",
+    "Tarif platform dihitung otomatis berdasarkan marketplace dan kategori hasil prediksi.",
+  PPh_FINAL_NOT_APPLIED_OVER_4_8B:
+    "Omzet di atas Rp4,8 miliar tidak dihitung dengan tarif PPh Final UMKM 0,5%; periksa kewajiban pajak dengan konsultan.",
   UNKNOWN_CATEGORY_TARIFF_FALLBACK:
     "Kategori tarif spesifik belum tersedia, jadi tarif kategori Lainnya dipakai sebagai acuan.",
   MARKET_DATA_STALE: "Data harga pasar mungkin sudah berubah. Periksa kembali sebelum menjual.",
@@ -157,7 +159,6 @@ const COST_LABELS: Record<string, string> = {
   shipping_program: "Program ongkir",
   processing_fee: "Biaya pemrosesan",
   income_tax: "Pajak penghasilan",
-  vat: "PPN",
   net_profit: "Laba bersih",
 };
 

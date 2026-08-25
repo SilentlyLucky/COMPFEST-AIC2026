@@ -61,7 +61,7 @@
   <text x="160" y="487" class="t" fill="#F99404" font-size="42" font-weight="800">Rp62.000</text>
 
   <!-- Interval shown as text only -->
-  <text x="455" y="440" class="t" fill="#A8CCE7" font-size="13.5">INTERVAL PASAR</text>
+  <text x="455" y="440" class="t" fill="#A8CCE7" font-size="13.5"></text>
   <text x="455" y="478" class="t" fill="#FFFFFF" font-size="23" font-weight="700">Rp48.000–Rp78.000</text>
 
   <!-- Confidence remains visually distinct -->

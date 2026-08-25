@@ -1,0 +1,22 @@
+{
+  "0": "ListingResult.tsx",
+  "1": "listing-validation.ts",
+  "2": "devDependencies",
+  "3": "compilerOptions",
+  "4": "ListingWizard.tsx",
+  "5": "LandingPage.tsx",
+  "6": "components.json",
+  "7": "dependencies",
+  "8": "listing-api.ts",
+  "9": "landing-page-assets.test.ts",
+  "10": "layout.tsx",
+  "11": "LAPAKIN Frontend",
+  "12": "next.config.ts",
+  "13": "AGENTS.md",
+  "14": "eslint.config.mjs",
+  "15": "postcss.config.mjs",
+  "16": "CLAUDE.md",
+  "17": "copy-listing.test.ts",
+  "18": "next-config.test.ts",
+  "19": "ListingForm.tsx"
+}

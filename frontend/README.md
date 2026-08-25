@@ -4,7 +4,7 @@ Frontend Next.js untuk membuat listing UMKM dari foto, fakta produk, dan kompone
 
 ## Menjalankan lokal
 
-Backend FastAPI perlu berjalan di `http://127.0.0.1:8000`. Secara default browser memanggil
+Backend FastAPI perlu berjalan di `http://127.0.0.1:8012`. Secara default browser memanggil
 `/v1/*` pada origin frontend yang sama dan Next.js meneruskannya ke backend tersebut, sehingga
 deployment tidak memerlukan `NEXT_PUBLIC_API_BASE_URL` atau konfigurasi CORS tambahan.
 
@@ -13,16 +13,16 @@ proses Next.js (contoh: `http://127.0.0.1:8001`). Untuk deployment dengan API pa
 terpisah, buat `frontend/.env.local`:
 
 ```dotenv
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8012
 ```
 
 Jalankan frontend dari folder ini:
 
 ```bash
-npx next dev
+npm run dev
 ```
 
-Buka `http://localhost:3000`. Landing tersedia di `/` dan wizard di `/buat-listing`.
+Buka `http://localhost:3012`. Landing tersedia di `/` dan wizard di `/buat-listing`.
 
 ## Verifikasi
 

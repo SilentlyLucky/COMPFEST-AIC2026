@@ -6,16 +6,20 @@ import {
   type DragEvent,
   type FormEvent,
 } from "react";
-import { ChevronDown, FileImage, LoaderCircle, Trash2, X } from "lucide-react";
+import {
+  ChevronDown,
+  FileImage,
+  LoaderCircle,
+  ShieldCheck,
+  Trash2,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  hppAmountForLabel,
-  parseVariantLabels,
-  pruneHppMap,
-  updateHppMap,
+  ANNUAL_TURNOVER_TAX_THRESHOLD_IDR,
   type FieldErrors,
   type ListingField,
   type ListingFormValues,
@@ -47,13 +51,13 @@ interface ListingFormProps {
   progressMessage: string | null;
   detailsOpen: boolean;
   pricingOpen: boolean;
-  hasSubmitError: boolean;
   onDetailsOpenChange: (open: boolean) => void;
   onPricingOpenChange: (open: boolean) => void;
   onFieldChange: (field: keyof ListingFormValues, value: string) => void;
   onImageChange: (file: File | null) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onCancel: () => void;
+  onDeleteDraft: () => void;
 }
 
 function FieldError({
@@ -98,7 +102,6 @@ function MoneyInput({
   value,
   errors,
   disabled,
-  min,
   required = false,
   onChange,
 }: {
@@ -110,13 +113,15 @@ function MoneyInput({
   value: string;
   errors: FieldErrors;
   disabled: boolean;
-  min: number;
   required?: boolean;
   onChange: (value: string) => void;
 }) {
   return (
     <div>
-      <Label htmlFor={field}>{label}</Label>
+      <Label htmlFor={field}>
+        {label}
+        {required && <span className="text-status-error">(wajib)</span>}
+      </Label>
       <div className="relative mt-3">
         <span
           className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm font-medium text-ink-muted"
@@ -126,17 +131,14 @@ function MoneyInput({
         </span>
         <Input
           id={field}
-          type="number"
+          type="text"
           inputMode="numeric"
-          min={min}
-          max={1_000_000_000}
-          step={1}
           className="rounded-[12px] bg-[#FBFCFE] pl-10"
-          value={value}
+          value={formatHppInput(value)}
           disabled={disabled}
           required={required}
           aria-required={required || undefined}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(event) => onChange(event.target.value.replace(/\D/g, ""))}
           {...errorProps(field, errors)}
         />
       </div>
@@ -154,7 +156,7 @@ function PercentInput({
   max,
   onChange,
 }: {
-  field: Extract<ListingField, "targetMargin" | "platformFee">;
+  field: Extract<ListingField, "targetMargin">;
   label: string;
   value: string;
   errors: FieldErrors;
@@ -191,161 +193,9 @@ function PercentInput({
   );
 }
 
-type AdvancedField = Extract<
-  ListingField,
-  | "purchaseUnit"
-  | "purchaseQuantity"
-  | "saleContent"
-  | "saleUnit"
-  | "outputUnitCount"
-  | "outputUnitLabel"
-  | "colors"
-  | "sizes"
-  | "hppPerSize"
-  | "grades"
-  | "hppPerGrade"
-  | "annualTurnover"
->;
-
-function AdvancedInput({
-  field,
-  label,
-  value,
-  errors,
-  disabled,
-  help,
-  placeholder,
-  type = "text",
-  inputMode,
-  min,
-  max,
-  step,
-  onChange,
-}: {
-  field: AdvancedField;
-  label: string;
-  value: string;
-  errors: FieldErrors;
-  disabled: boolean;
-  help?: string;
-  placeholder?: string;
-  type?: "text" | "number";
-  inputMode?: "decimal" | "numeric";
-  min?: number;
-  max?: number;
-  step?: number | "any";
-  onChange: (value: string) => void;
-}) {
-  const helpId = help ? `${field}-help` : undefined;
-  return (
-    <div>
-      <Label htmlFor={field}>{label}</Label>
-      <Input
-        id={field}
-        type={type}
-        inputMode={inputMode}
-        min={min}
-        max={max}
-        step={step}
-        className="mt-3 rounded-[12px] bg-[#FBFCFE]"
-        value={value}
-        placeholder={placeholder}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-        {...errorProps(field, errors, helpId)}
-      />
-      {help && (
-        <p id={helpId} className="mt-2 text-sm leading-6 text-ink-muted">
-          {help}
-        </p>
-      )}
-      <FieldError field={field} errors={errors} />
-    </div>
-  );
-}
-
-type HppField = Extract<ListingField, "hppPerSize" | "hppPerGrade">;
-type VariationField = Extract<ListingField, "sizes" | "grades">;
-
-function HppFieldGroup({
-  field,
-  labelField,
-  labelValue,
-  value,
-  errors,
-  disabled,
-  onChange,
-}: {
-  field: HppField;
-  labelField: VariationField;
-  labelValue: string;
-  value: string;
-  errors: FieldErrors;
-  disabled: boolean;
-  onChange: (label: string, value: string) => void;
-}) {
-  const labels = parseVariantLabels(labelValue);
-  const labelType = labelField === "sizes" ? "ukuran" : "grade";
-  const heading = `HPP per ${labelType}`;
-  const helpId = `${field}-help`;
-
-  return (
-    <fieldset
-      id={field}
-      tabIndex={-1}
-      className="rounded-xl border border-line/70 bg-soft-canvas/60 p-4 focus:outline-2 focus:outline-offset-4 focus:outline-brand sm:col-span-2"
-      {...errorProps(field, errors, helpId)}
-    >
-      <legend className="px-1 text-base font-semibold text-ink">{heading}</legend>
-      <p id={helpId} className="mt-2 text-sm leading-6 text-ink-muted">
-        Isi HPP dalam rupiah untuk setiap {labelType} yang kamu tambahkan.
-      </p>
-      {labels.length > 0 ? (
-        <div className="mt-4 space-y-3">
-          {labels.map((label, index) => {
-            const inputId = `${field}-${index}`;
-            return (
-              <div
-                key={`${label}-${index}`}
-                className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)] sm:items-center sm:gap-3"
-              >
-                <Label htmlFor={inputId} className="min-h-11 break-words">
-                  {label}
-                </Label>
-                <div className="relative">
-                  <span
-                    className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm font-medium text-ink-muted"
-                    aria-hidden="true"
-                  >
-                    Rp
-                  </span>
-                  <Input
-                    id={inputId}
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    max={1_000_000_000}
-                    step={1}
-                    className="pl-10"
-                    value={hppAmountForLabel(value, label)}
-                    disabled={disabled}
-                    aria-invalid={errors[field] ? true : undefined}
-                    aria-describedby={errors[field] ? `${field}-error` : undefined}
-                    onChange={(event) => onChange(label, event.target.value)}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <p className="mt-4 rounded-xl border border-dashed border-line bg-surface px-4 py-3 text-sm leading-6 text-ink-muted">
-          Tambahkan {labelType} di atas, lalu kolom harga HPP akan muncul otomatis.
-        </p>
-      )}
-      <FieldError field={field} errors={errors} />
-    </fieldset>
-  );
+function formatHppInput(value: string) {
+  const digits = value.replace(/\D/g, "");
+  return digits ? new Intl.NumberFormat("id-ID").format(Number(digits)) : "";
 }
 
 export function ListingForm({
@@ -356,13 +206,13 @@ export function ListingForm({
   progressMessage,
   detailsOpen,
   pricingOpen,
-  hasSubmitError,
   onDetailsOpenChange,
   onPricingOpenChange,
   onFieldChange,
   onImageChange,
   onSubmit,
   onCancel,
+  onDeleteDraft,
 }: ListingFormProps) {
   const [isDragging, setIsDragging] = useState(false);
 
@@ -381,24 +231,6 @@ export function ListingForm({
     selectFile(event.dataTransfer.files?.[0] ?? null);
   }
 
-  function handleVariationChange(
-    field: VariationField,
-    hppField: HppField,
-    value: string,
-  ) {
-    const previousLabels = parseVariantLabels(values[field]);
-    const nextLabels = parseVariantLabels(value);
-    const nextHppValue = pruneHppMap(
-      values[hppField],
-      nextLabels,
-      previousLabels,
-    );
-    onFieldChange(field, value);
-    if (nextHppValue !== values[hppField]) {
-      onFieldChange(hppField, nextHppValue);
-    }
-  }
-
   return (
     <form
       onSubmit={onSubmit}
@@ -413,7 +245,7 @@ export function ListingForm({
               id="foto-heading"
               className="text-lg font-semibold tracking-[-0.02em] text-ink"
             >
-              Foto produk <span className="text-link">(wajib)</span>
+              Foto produk <span className="text-status-error">(wajib)</span>
             </h2>
             <p
               id="image-help"
@@ -431,7 +263,7 @@ export function ListingForm({
             onDragOver={(event) => event.preventDefault()}
             onDragLeave={() => setIsDragging(false)}
             onDrop={handleDrop}
-            className={`relative mt-4 flex min-h-56 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border p-6 text-center transition-colors motion-reduce:transition-none sm:min-h-64 lg:min-h-80 ${previewUrl ? "border-[#AAB8C7] bg-[#F3F8FC]" : errors.image ? "border-2 border-dashed border-status-error bg-[#FFF8F7]" : isDragging ? "border-2 border-dashed border-brand bg-brand-soft" : "border-2 border-dashed border-[#9AC9E8] bg-[#F3F8FC] hover:border-brand"} focus-within:border-brand focus-within:ring-4 focus-within:ring-brand/28`}
+            className={`relative mt-4 flex min-h-56 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border p-6 text-center transition-colors motion-reduce:transition-none sm:min-h-64 lg:min-h-80 ${errors.image ? "border-2 border-dashed border-status-error bg-status-error-soft" : previewUrl ? "border-[#AAB8C7] bg-[#F3F8FC]" : isDragging ? "border-2 border-dashed border-brand bg-brand-soft" : "border-2 border-dashed border-[#9AC9E8] bg-[#F3F8FC] hover:border-brand"} focus-within:ring-4 ${errors.image ? "focus-within:border-status-error focus-within:ring-status-error/28" : "focus-within:border-brand focus-within:ring-brand/28"}`}
           >
             <Input
               id="image"
@@ -503,7 +335,7 @@ export function ListingForm({
           <div className="mt-6 grid gap-x-6 gap-y-6 sm:grid-cols-2">
             <div>
               <Label htmlFor="platform">
-                Platform tujuan <span className="text-link">(wajib)</span>
+                Platform tujuan <span className="text-status-error">(wajib)</span>
               </Label>
               <select
                 id="platform"
@@ -527,7 +359,7 @@ export function ListingForm({
             </div>
             <div>
               <Label htmlFor="marketRegionCode">
-                Wilayah pasar <span className="text-link">(wajib)</span>
+                Wilayah pasar <span className="text-status-error">(wajib)</span>
               </Label>
               <select
                 id="marketRegionCode"
@@ -553,11 +385,10 @@ export function ListingForm({
             <div className="sm:col-span-2">
               <MoneyInput
                 field="productionCost"
-                label="Biaya produksi per unit (wajib)"
+                label="Biaya produksi per unit"
                 value={values.productionCost}
                 errors={errors}
                 disabled={isSubmitting}
-                min={1000}
                 required
                 onChange={(value) => onFieldChange("productionCost", value)}
               />
@@ -566,7 +397,7 @@ export function ListingForm({
         </section>
       </div>
 
-      <section aria-labelledby="details-heading" className={`rounded-2xl border border-[#E1EAF1] ${detailsOpen ? "bg-surface" : "bg-[#F8FBFD]"} p-4 sm:p-5`}>
+      <section aria-labelledby="details-heading" className={`rounded-2xl border border-[#E1EAF1] ${detailsOpen ? "bg-surface" : "bg-white/70"} p-4 sm:p-5`}>
         <button
           type="button"
           className="flex min-h-11 w-full items-center justify-between gap-4 rounded-xl px-1 text-left font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
@@ -681,7 +512,7 @@ export function ListingForm({
         )}
       </section>
 
-      <section aria-labelledby="pricing-heading" className={`rounded-2xl border border-[#E1EAF1] ${pricingOpen ? "bg-surface" : "bg-[#F8FBFD]"} p-4 sm:p-5`}>
+      <section aria-labelledby="pricing-heading" className={`rounded-2xl border border-[#E1EAF1] ${pricingOpen ? "bg-surface" : "bg-white/70"} p-4 sm:p-5`}>
         <button
           type="button"
           className="flex min-h-11 w-full items-center justify-between gap-4 rounded-xl px-1 text-left font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
@@ -714,7 +545,6 @@ export function ListingForm({
               value={values.packagingCost}
               errors={errors}
               disabled={isSubmitting}
-              min={0}
               onChange={(value) => onFieldChange("packagingCost", value)}
             />
             <MoneyInput
@@ -723,7 +553,6 @@ export function ListingForm({
               value={values.otherCost}
               errors={errors}
               disabled={isSubmitting}
-              min={0}
               onChange={(value) => onFieldChange("otherCost", value)}
             />
             <PercentInput
@@ -735,218 +564,47 @@ export function ListingForm({
               max={80}
               onChange={(value) => onFieldChange("targetMargin", value)}
             />
-            <div>
-              <PercentInput
-                field="platformFee"
-                label="Biaya platform"
-                value={values.platformFee}
-                errors={errors}
-                disabled={isSubmitting}
-                max={40}
-                onChange={(value) => onFieldChange("platformFee", value)}
-              />
-              {values.platform !== "umum" &&
-                Number(values.platformFee || 0) === 0 && (
-                  <p className="mt-2 flex items-center gap-2 text-sm leading-6 text-ink-muted">
-                    <span
-                      className="size-2 rounded-full bg-amber"
-                      aria-hidden="true"
-                    />
-                    Tarif platform terbaru akan diterapkan otomatis jika dibiarkan 0%.
-                  </p>
-                )}
-            </div>
-            <div className="sm:col-span-2 border-t border-line/70 pt-6">
-              <h3 className="text-base font-semibold text-ink">
-                Detail satuan &amp; variasi (opsional)
-              </h3>
-              <p className="mt-2 text-sm leading-6 text-ink-muted">
-                Tanpa detail, biaya produksi dianggap sebagai biaya per unit. Jika kamu mengisi basis batch atau satuan, biaya produksi di atas dikirim sebagai total HPP dan backend mengubahnya menjadi HPP per unit jual.
-              </p>
-            </div>
-            <AdvancedInput
-              field="purchaseUnit"
-              label="Unit pembelian atau batch"
-              value={values.purchaseUnit}
-              errors={errors}
-              disabled={isSubmitting}
-              placeholder="Contoh: kg"
-              help="Isi bersama jumlah pembelian, misalnya 3 kg."
-              onChange={(value) => onFieldChange("purchaseUnit", value)}
-            />
-            <AdvancedInput
-              field="purchaseQuantity"
-              label="Jumlah pembelian"
-              value={values.purchaseQuantity}
-              errors={errors}
-              disabled={isSubmitting}
-              type="number"
-              inputMode="decimal"
-              min={0.01}
-              step="any"
-              placeholder="Contoh: 3"
-              onChange={(value) => onFieldChange("purchaseQuantity", value)}
-            />
-            <AdvancedInput
-              field="saleContent"
-              label="Isi per unit jual"
-              value={values.saleContent}
-              errors={errors}
-              disabled={isSubmitting}
-              type="number"
-              inputMode="decimal"
-              min={0.01}
-              step="any"
-              placeholder="Contoh: 250"
-              onChange={(value) => onFieldChange("saleContent", value)}
-            />
-            <AdvancedInput
-              field="saleUnit"
-              label="Unit isi jual"
-              value={values.saleUnit}
-              errors={errors}
-              disabled={isSubmitting}
-              placeholder="Contoh: g, ml, kg, l"
-              help="Dipakai untuk konversi isi; gunakan unit massa atau volume."
-              onChange={(value) => onFieldChange("saleUnit", value)}
-            />
-            <AdvancedInput
-              field="outputUnitCount"
-              label="Jumlah unit keluaran"
-              value={values.outputUnitCount}
-              errors={errors}
-              disabled={isSubmitting}
-              type="number"
-              inputMode="decimal"
-              min={0.01}
-              step="any"
-              placeholder="Contoh: 12"
-              help="Boleh diisi tanpa unit pembelian jika jumlah hasil sudah diketahui."
-              onChange={(value) => onFieldChange("outputUnitCount", value)}
-            />
-            <AdvancedInput
-              field="outputUnitLabel"
-              label="Label unit keluaran"
-              value={values.outputUnitLabel}
-              errors={errors}
-              disabled={isSubmitting}
-              placeholder="Contoh: botol, bungkus, bag"
-              help="Nama unit jual yang tampil di hasil; boleh berupa label produk."
-              onChange={(value) => onFieldChange("outputUnitLabel", value)}
-            />
-            <AdvancedInput
-              field="colors"
-              label="Warna"
-              value={values.colors}
-              errors={errors}
-              disabled={isSubmitting}
-              placeholder="Contoh: merah, biru"
-              help="Pisahkan dengan koma; label duplikat akan dirapikan."
-              onChange={(value) => onFieldChange("colors", value)}
-            />
-            <AdvancedInput
-              field="sizes"
-              label="Ukuran"
-              value={values.sizes}
-              errors={errors}
-              disabled={isSubmitting}
-              placeholder="Contoh: 250 g, 500 g"
-              help="Pisahkan beberapa ukuran dengan koma, misalnya 250 g, 500 g."
-              onChange={(value) =>
-                handleVariationChange("sizes", "hppPerSize", value)
-              }
-            />
-            <HppFieldGroup
-              field="hppPerSize"
-              labelField="sizes"
-              labelValue={values.sizes}
-              value={values.hppPerSize}
-              errors={errors}
-              disabled={isSubmitting}
-              onChange={(label, value) =>
-                onFieldChange(
-                  "hppPerSize",
-                  updateHppMap(values.hppPerSize, label, value),
-                )
-              }
-            />
-            <AdvancedInput
-              field="grades"
-              label="Grade atau kelas"
-              value={values.grades}
-              errors={errors}
-              disabled={isSubmitting}
-              placeholder="Contoh: reguler, premium"
-              help="Pisahkan beberapa grade dengan koma, misalnya reguler, premium."
-              onChange={(value) =>
-                handleVariationChange("grades", "hppPerGrade", value)
-              }
-            />
-            <HppFieldGroup
-              field="hppPerGrade"
-              labelField="grades"
-              labelValue={values.grades}
-              value={values.hppPerGrade}
-              errors={errors}
-              disabled={isSubmitting}
-              onChange={(label, value) =>
-                onFieldChange(
-                  "hppPerGrade",
-                  updateHppMap(values.hppPerGrade, label, value),
-                )
-              }
-            />
-            <AdvancedInput
-              field="annualTurnover"
-              label="Omzet tahunan (Rp)"
-              value={values.annualTurnover}
-              errors={errors}
-              disabled={isSubmitting}
-              type="number"
-              inputMode="numeric"
-              min={0}
-              max={100_000_000_000}
-              step={1}
-              placeholder="Contoh: 600000000"
-              help="Opsional; dipakai untuk memperhitungkan pajak UMKM bila relevan."
-              onChange={(value) => onFieldChange("annualTurnover", value)}
-            />
             <div className="sm:col-span-2">
               <Label
-                htmlFor="vatRegistered"
-                className="min-h-11 cursor-pointer rounded-xl px-1"
+                htmlFor="annualTurnover"
+                className="min-h-11 cursor-pointer text-base leading-6"
               >
                 <input
-                  id="vatRegistered"
+                  id="annualTurnover"
                   type="checkbox"
-                  className="size-5 accent-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                  checked={values.vatRegistered === "true"}
+                  className="size-5 shrink-0 accent-brand focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
+                  checked={
+                    Number(values.annualTurnover) >
+                    ANNUAL_TURNOVER_TAX_THRESHOLD_IDR
+                  }
                   disabled={isSubmitting}
                   onChange={(event) =>
                     onFieldChange(
-                      "vatRegistered",
-                      event.target.checked ? "true" : "false",
+                      "annualTurnover",
+                      event.target.checked
+                        ? String(ANNUAL_TURNOVER_TAX_THRESHOLD_IDR + 1)
+                        : "0",
                     )
                   }
-                  {...errorProps("vatRegistered", errors)}
+                  {...errorProps("annualTurnover", errors, "annualTurnover-help")}
                 />
-                <span>Usaha terdaftar PKP / dikenai PPN</span>
+                <span>Apakah omzet tahunanmu di atas Rp500 juta?</span>
               </Label>
-              <p className="mt-2 text-sm leading-6 text-ink-muted">
-                Centang jika status pajak ini perlu diperhitungkan dalam harga.
+              <p
+                id="annualTurnover-help"
+                className="mt-2 text-sm leading-6 text-ink-muted"
+              >
+                {Number(values.annualTurnover) > ANNUAL_TURNOVER_TAX_THRESHOLD_IDR
+                  ? "Pilihanmu: Ya. Estimasi PPh Final UMKM 0,5% akan ikut dihitung dalam harga. Hasil sebenarnya tetap bergantung pada status pajakmu."
+                  : "Pilihanmu: Tidak. PPh Final UMKM belum ditambahkan karena omzet sampai Rp500 juta mendapat fasilitas bebas pajak."}
               </p>
-              <FieldError field="vatRegistered" errors={errors} />
+              <FieldError field="annualTurnover" errors={errors} />
             </div>
           </div>
         )}
       </section>
 
       <div className="lg:ml-auto lg:w-fit">
-        {hasSubmitError && (
-          <p role="alert" className="mb-3 text-sm leading-6 text-status-error lg:text-right">
-            Lengkapi bagian yang ditandai untuk melanjutkan.
-          </p>
-        )}
         {isSubmitting && progressMessage && (
           <p className="mb-3 text-sm leading-6 text-ink-muted lg:text-right" role="status">
             {progressMessage}
@@ -965,6 +623,17 @@ export function ListingForm({
             </Button>
           )}
           <Button
+            type="button"
+            variant="destructive"
+            size="lg"
+            className="flex-1 rounded-[12px] lg:flex-none"
+            onClick={onDeleteDraft}
+            disabled={isSubmitting}
+          >
+            <Trash2 aria-hidden="true" />
+            Hapus draft
+          </Button>
+          <Button
             type="submit"
             size="lg"
             className="flex-1 rounded-[12px] lg:flex-none"
@@ -981,6 +650,32 @@ export function ListingForm({
           </Button>
         </div>
       </div>
+      <section
+        aria-labelledby="privacy-heading"
+        className="mt-5 rounded-xl border border-line/70 bg-white/70 px-4 py-3"
+      >
+        <div className="flex items-center gap-3">
+          <ShieldCheck className="size-5 shrink-0 text-brand" aria-hidden="true" />
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3">
+            <h2
+              id="privacy-heading"
+              className="text-sm font-semibold leading-6 text-ink sm:text-base"
+            >
+              Fotomu hanya digunakan untuk membantu membuat listing ini.
+            </h2>
+            <details className="text-sm leading-6 text-ink-muted">
+              <summary className="inline-flex min-h-11 cursor-pointer items-center font-medium text-link focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand">
+                Cara data digunakan
+              </summary>
+              <ul className="mt-3 grid list-disc gap-2 pl-5">
+                <li>Foto dan informasi produk membantu menyusun listing, kategori, dan rekomendasi harga.</li>
+                <li>Foto tidak digunakan untuk pelatihan tanpa opt-in terpisah.</li>
+                <li>Kamu tetap memeriksa hasil sebelum menerbitkan listing.</li>
+              </ul>
+            </details>
+          </div>
+        </div>
+      </section>
     </form>
   );
 }

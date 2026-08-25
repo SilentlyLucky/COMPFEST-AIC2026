@@ -84,7 +84,7 @@ artifacts, and starts one Uvicorn worker. Override the bind address or port when
 needed:
 
 ```sh
-HOST=127.0.0.1 PORT=8000 ./run.sh
+HOST=127.0.0.1 PORT=8012 ./run.sh
 RELOAD=1 HOST=127.0.0.1 ./run.sh   # local development only
 ```
 
@@ -97,16 +97,16 @@ path first:
 
 ```sh
 export HF_HOME="$(pwd)/../.cache/huggingface"
-python -m uvicorn main:app --host 0.0.0.0 --port 8000
+python -m uvicorn main:app --host 0.0.0.0 --port 8012
 ```
 
 `CORS_ALLOWED_ORIGINS` accepts a comma-separated list of complete HTTP(S)
-origins. It defaults to `http://localhost:3000` for local development.
+origins. It defaults to `http://localhost:3012` for local development.
 
 Check readiness before sending traffic:
 
 ```sh
-curl http://localhost:8000/health/ready
+curl http://localhost:8012/health/ready
 ```
 
 `/health/live` only shows that the process is alive. Application startup fails

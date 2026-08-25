@@ -204,15 +204,14 @@ describe("listing validation", () => {
     );
   });
 
-  it("rejects advanced pricing when default fees, tax, and VAT exceed the margin guard", () => {
+  it("rejects pricing when default fees and PPh exceed the margin guard", () => {
     const result = validateListing(
       validValues({
         platform: "shopee",
         marketRegionCode: "ID-JK",
-        targetMargin: "80",
-        platformFee: "0",
-        annualTurnover: "500000000",
-        vatRegistered: "true",
+        targetMargin: "79.5",
+        platformFee: "15",
+        annualTurnover: "500000001",
       }),
       makeImage(),
     );
@@ -221,7 +220,6 @@ describe("listing validation", () => {
     expect(result.errors).toMatchObject({
       targetMargin: expect.stringContaining("kurang dari 95%"),
       annualTurnover: expect.stringContaining("pajak UMKM"),
-      vatRegistered: expect.stringContaining("PPN"),
     });
     expect(result.errors.targetMargin).toContain("pemrosesan");
   });

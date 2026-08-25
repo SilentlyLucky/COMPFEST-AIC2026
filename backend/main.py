@@ -45,7 +45,7 @@ API_VERSION = "v1"
 REQUEST_TIMEOUT_SECONDS = 45
 MAX_CONCURRENT_GENERATIONS = 5
 CORS_ALLOWED_ORIGINS_ENV = "CORS_ALLOWED_ORIGINS"
-DEFAULT_CORS_ORIGINS = ("http://localhost:3000",)
+DEFAULT_CORS_ORIGINS = ("http://localhost:3012",)
 
 ADAPTER_PATH = Path(__file__).resolve().parent / "ai" / "listing" / "model"
 CATEGORY_SERVICE = OpenClipCategoryClassifier(
@@ -364,4 +364,4 @@ async def predict_price(_: PredictPriceRequest) -> NoReturn:
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8012)

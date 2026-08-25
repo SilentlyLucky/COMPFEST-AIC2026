@@ -94,7 +94,7 @@
   <circle cx="650" cy="285" r="79" fill="#FFFFFF" stroke="#2A89CD" stroke-width="4"/>
   <circle cx="650" cy="285" r="57" fill="#FFF1D8"/>
   <circle cx="650" cy="285" r="37" fill="#F99404"/>
-  <text x="650" y="294" text-anchor="middle" class="t" fill="#00295D" font-size="26" font-weight="800">AI</text>
+  <text x="650" y="294" text-anchor="middle" class="t" fill="#FFFFFF" font-size="26" font-weight="800">AI</text>
 </g>
 <circle class="anim" cx="650" cy="285" r="57" fill="none" stroke="#F99404" stroke-width="3" opacity="0">
   <animate attributeName="r" dur="5.4s" repeatCount="indefinite" values="57;57;57;66;76;57" keyTimes="0;.30;.36;.44;.52;1"/>

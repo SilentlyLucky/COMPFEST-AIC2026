@@ -41,8 +41,8 @@ const PROCESS_STEPS = [
   {
     id: "pipeline",
     eyebrow: "Pipeline",
-    title: "Satu alur yang mengikuti cara kamu menyiapkan lapak.",
-    body: "Mulai dari foto dan fakta dasar produk, LAPAKIN mengolahnya menjadi hasil listing yang lebih siap ditinjau.",
+    title: "Satu alur yang menyiapkan lapakmu.",
+    body: "LAPAKIN mengubah foto dan data produk menjadi hasil listing yang menarik.",
     asset: "/assets/lapakin/process/01-full-pipeline.svg",
     alt: "Alur LAPAKIN dari foto dan fakta produk hingga draft listing.",
     width: 1180,
@@ -51,27 +51,15 @@ const PROCESS_STEPS = [
     details: [],
   },
   {
-    id: "input",
-    eyebrow: "Masukkan",
-    title: "Masukkan yang kamu punya dulu.",
-    body: "Cukup mulai dari satu foto produk dan informasi dasar yang benar-benar kamu ketahui, seperti platform atau biaya produksi.",
-    asset: "/assets/lapakin/process/02-input.svg",
-    alt: "Input LAPAKIN berupa foto produk dan informasi dasar yang diketahui penjual.",
-    width: 980,
-    height: 558,
-    desktopImageClass: "xl:w-full",
-    details: [],
-  },
-  {
     id: "models",
     eyebrow: "AI Model",
     title: "Di balik layar, tiga model bekerja bersama.",
-    body: "Model vision-language membantu menyusun judul dan deskripsi. Model visual similarity mencari produk pembanding. Model text matching membaca katalog dan harga pasar yang relevan.",
+    body: "Qwen menyusun judul dan deskripsi, OpenCLIP membantu menentukan kategori produk, sementara TF-IDF mencocokkan produk dengan referensi harga pasar.",
     asset: "/assets/lapakin/process/03-ai-models.svg",
     alt: "Tiga model AI LAPAKIN untuk judul dan deskripsi, produk pembanding, serta harga pasar.",
     width: 1280,
     height: 720,
-    desktopImageClass: "xl:w-[107%] xl:-translate-x-[7%]",
+    desktopImageClass: "xl:w-full",
     details: [
       "Qwen2.5-VL-3B-Instruct + LoRA untuk judul dan deskripsi.",
       "OpenCLIP ViT-B-32 + LAION2B untuk kandidat produk pembanding.",
@@ -82,9 +70,9 @@ const PROCESS_STEPS = [
     id: "output",
     eyebrow: "Hasil Akhir",
     title: "Satu hasil yang siap kamu cek dan pakai.",
-    body: "Kamu akan menerima draft listing yang berisi judul, kategori, deskripsi, rekomendasi harga, interval pasar, dan confidence untuk membantu proses tinjau.",
+    body: "Kamu akan menerima draft listing yang berisi judul, kategori, deskripsi, rekomendasi harga, dan tingkat keyakinan prediksi.",
     asset: "/assets/lapakin/process/04-output.svg",
-    alt: "Draft listing berisi judul, kategori, deskripsi, rekomendasi harga, interval pasar, dan confidence.",
+    alt: "Draft listing berisi judul, kategori, deskripsi, rekomendasi harga, dan tingkat keyakinan prediksi.",
     width: 950,
     height: 540,
     desktopImageClass: "xl:w-full",
@@ -187,24 +175,24 @@ export function LandingPage() {
         </section>
         <section
           id="cara-kerja"
-          className="bg-canvas px-5 py-20 sm:px-6 md:py-36"
+          className="bg-canvas px-5 py-12 sm:px-6 md:py-20"
         >
           <div className="mx-auto max-w-7xl">
             <div className="max-w-3xl">
               <p className="text-sm font-semibold tracking-[.08em] text-link">
                 CARA KERJA
               </p>
-              <h2 className="mt-5 text-balance text-[clamp(2.25rem,4vw,3.75rem)] font-semibold leading-[1.04] tracking-[-.04em] text-ink">
-                Dari awal sampai hasil yang siap ditinjau.
+              <h2 className="mt-5 whitespace-nowrap text-[clamp(2rem,4vw,4rem)] font-semibold leading-[1.04] tracking-[-.04em] text-ink">
+                Cara LAPAKIN menyusun listingmu
               </h2>
             </div>
-            <div className="mt-20 space-y-24 md:space-y-32">
+            <div className="mt-4 space-y-24 md:mt-8 md:space-y-32">
               {PROCESS_STEPS.map((step, index) => (
                 <article
                   key={step.id}
                   id={step.id === "output" ? "hasil" : undefined}
                   data-stack-card
-                  className="landing-feature grid min-w-0 items-center gap-10 border-t border-line pt-10 xl:grid-cols-12 xl:gap-16 xl:pt-14"
+                  className="landing-feature relative z-10 grid min-w-0 items-center gap-10 bg-canvas border-t border-line pt-10 xl:grid-cols-12 xl:gap-16 xl:pt-14"
                 >
                   <div
                     className={`xl:col-span-4 ${index % 2 ? "xl:order-2 xl:col-start-9" : ""}`}
@@ -229,6 +217,7 @@ export function LandingPage() {
                   </div>
                   <div
                     data-process-image
+                    data-model-process-image={step.id === "models" ? true : undefined}
                     className={`flex min-w-0 items-center justify-center ${step.id === "models" ? "xl:min-h-[400px]" : "xl:min-h-80"} ${index % 2 ? "xl:order-1 xl:col-span-8" : "xl:col-span-8"}`}
                   >
                     <figure className="w-full">

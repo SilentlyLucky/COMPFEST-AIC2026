@@ -12,13 +12,13 @@ const PLATFORM_DEDUCTIONS: Record<
   { commissionPct: number; shippingPct: number; processingIdr: number }
 > = {
   tokopedia: { commissionPct: 8, shippingPct: 0, processingIdr: 1_250 },
-  shopee: { commissionPct: 10, shippingPct: 6, processingIdr: 1_250 },
+  shopee: { commissionPct: 10, shippingPct: 0, processingIdr: 1_250 },
   blibli: { commissionPct: 10, shippingPct: 0, processingIdr: 0 },
   umum: { commissionPct: 0, shippingPct: 0, processingIdr: 0 },
 };
-const ANNUAL_TURNOVER_TAX_THRESHOLD_IDR = 500_000_000;
+export const ANNUAL_TURNOVER_TAX_THRESHOLD_IDR = 500_000_000;
+const ANNUAL_TURNOVER_TAX_MAX_IDR = 4_800_000_000;
 const ANNUAL_TURNOVER_TAX_PCT = 0.5;
-const VAT_PCT = 11;
 const MAX_EFFECTIVE_DEDUCTIONS_PCT = 95;
 
 export interface ListingFormValues {
@@ -378,15 +378,16 @@ function validateEffectivePricingDeductions(
   const commissionPct = platformFee !== 0
     ? platformFee
     : deductions.commissionPct;
-  const turnoverTaxPct = annualTurnover >= ANNUAL_TURNOVER_TAX_THRESHOLD_IDR
+  const turnoverTaxPct =
+    annualTurnover > ANNUAL_TURNOVER_TAX_THRESHOLD_IDR &&
+    annualTurnover <= ANNUAL_TURNOVER_TAX_MAX_IDR
     ? ANNUAL_TURNOVER_TAX_PCT
     : 0;
   const effectiveDeductions =
     targetMargin +
     commissionPct +
     deductions.shippingPct +
-    turnoverTaxPct +
-    (vatRegistered ? VAT_PCT : 0);
+    turnoverTaxPct;
 
   if (effectiveDeductions < MAX_EFFECTIVE_DEDUCTIONS_PCT) return;
 
@@ -394,14 +395,10 @@ function validateEffectivePricingDeductions(
     ? " Biaya pemrosesan tetap ikut dihitung pada harga minimum."
     : "";
   errors.targetMargin =
-    `Jumlah margin, komisi platform, program ongkir, pajak, dan PPN harus kurang dari ${MAX_EFFECTIVE_DEDUCTIONS_PCT}%.${processingHint}`;
+    `Jumlah margin, komisi platform, program ongkir, dan pajak harus kurang dari ${MAX_EFFECTIVE_DEDUCTIONS_PCT}%.${processingHint}`;
   if (annualTurnover >= ANNUAL_TURNOVER_TAX_THRESHOLD_IDR) {
     errors.annualTurnover =
       "Turunkan omzet tahunan atau target margin agar pajak UMKM tetap tertampung.";
-  }
-  if (vatRegistered) {
-    errors.vatRegistered =
-      "Nonaktifkan PPN atau turunkan target margin agar total potongan tetap di bawah 95%";
   }
 }
 

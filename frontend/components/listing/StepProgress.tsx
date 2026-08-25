@@ -23,9 +23,10 @@ export function StepProgress({ currentStep }: { currentStep: 1 | 2 | 3 }) {
               key={label}
               className="flex min-w-0 flex-1 items-center"
               aria-current={active ? "step" : undefined}
+              aria-label={`${number}. ${label}: ${active ? "sedang dikerjakan" : complete ? "selesai" : "belum dimulai"}`}
             >
               <div
-                className={`flex min-h-12 min-w-0 items-center gap-3 ${active || complete ? "text-ink" : "text-ink-muted"}`}
+                className={`flex min-h-11 min-w-0 items-center gap-2 ${active || complete ? "text-ink" : "text-ink-muted"}`}
               >
                 <span
                   className={`grid size-10 shrink-0 place-items-center rounded-full border ${
@@ -43,16 +44,13 @@ export function StepProgress({ currentStep }: { currentStep: 1 | 2 | 3 }) {
                   )}
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-sm font-semibold">
-                    {number}. {label}
-                    {complete ? " · Selesai" : ""}
-                  </span>
+                  <span className="block text-sm font-semibold">{number}. {label}</span>
                   <span className="sr-only">{description}</span>
                 </span>
               </div>
               {number < STEPS.length && (
                 <span
-                  className={`mx-4 h-px min-w-4 flex-1 ${complete ? "bg-brand" : "bg-line"}`}
+                  className={`mx-3 h-px min-w-4 flex-1 ${complete ? "bg-brand" : "bg-line"}`}
                   aria-hidden="true"
                 />
               )}
@@ -65,7 +63,7 @@ export function StepProgress({ currentStep }: { currentStep: 1 | 2 | 3 }) {
           {currentStep} dari 3 · {STEPS[currentStep - 1].label}
         </p>
         <div
-          className="mt-3 h-1 overflow-hidden rounded-full bg-soft-canvas"
+          className="mt-2 h-1 overflow-hidden rounded-full bg-soft-canvas"
           aria-hidden="true"
         >
           <div

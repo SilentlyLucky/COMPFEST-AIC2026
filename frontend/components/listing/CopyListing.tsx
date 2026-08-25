@@ -19,6 +19,7 @@ interface CopyListingProps {
 export function CopyListing({ response, title, description, categoryCode, onBack, onRestart }: CopyListingProps) {
   const [status, setStatus] = useState("");
   const price = response.data.listing.price.recommended;
+  const category = CATEGORY_LABELS[categoryCode];
 
   async function copyText(label: string, value: string) {
     try {
@@ -32,7 +33,7 @@ export function CopyListing({ response, title, description, categoryCode, onBack
   const allContent = [
     title,
     description,
-    `Kategori: ${CATEGORY_LABELS[categoryCode]}`,
+    `Kategori: ${category}`,
     `Rekomendasi harga: ${price === null ? "Belum tersedia" : formatRupiah(price)}`,
   ].join("\n\n");
 
@@ -77,9 +78,17 @@ export function CopyListing({ response, title, description, categoryCode, onBack
           </article>
 
           <article className="grid gap-4 rounded-2xl border border-line bg-canvas p-5 sm:grid-cols-2">
-            <div>
-              <h3 className="text-sm font-medium text-ink-muted">Kategori</h3>
-              <p className="mt-2 font-semibold text-ink">{CATEGORY_LABELS[categoryCode]}</p>
+            <div className="min-w-0">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-medium text-ink-muted">Kategori</h3>
+                  <p className="mt-2 break-words font-semibold text-ink">{category}</p>
+                </div>
+                <Button type="button" variant="outline" onClick={() => copyText("Kategori", category)}>
+                  <Copy aria-hidden="true" />
+                  Salin kategori
+                </Button>
+              </div>
             </div>
             <div className="min-w-0">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

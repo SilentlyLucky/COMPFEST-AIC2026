@@ -1,0 +1,300 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="874" height="475" viewBox="40 110 1330 723"
+     role="img" aria-labelledby="title desc">
+  <title id="title">Alur LAPAKIN: foto produk diproses AI menjadi listing</title>
+  <desc id="desc">Semua animasi memakai satu siklus waktu yang sama. Titik besar masuk ke AI, AI bereaksi, lalu titik besar kuning keluar menuju hasil listing. Titik kecil mengikuti pada garis yang sama.</desc>
+
+  <defs>
+    <filter id="shadowLg" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#00295D" flood-opacity=".08"/>
+    </filter>
+    <filter id="shadowSm" x="-35%" y="-35%" width="170%" height="170%">
+      <feDropShadow dx="0" dy="7" stdDeviation="11" flood-color="#00295D" flood-opacity=".10"/>
+    </filter>
+    <filter id="amberGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feFlood flood-color="#F99404" flood-opacity=".26" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <linearGradient id="photoBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F8FCFE"/>
+      <stop offset="100%" stop-color="#E7F3FB"/>
+    </linearGradient>
+    <linearGradient id="listingBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00295D"/>
+      <stop offset="100%" stop-color="#0C3D78"/>
+    </linearGradient>
+
+    <path id="pathInputToAI" d="M425 319 C530 319 567 354 624 382"/>
+    <path id="pathAIToOutput" d="M797 408 C900 424 938 497 1008 536"/>
+  </defs>
+
+  <style>
+    .flow {
+      fill: none;
+      stroke: #2A89CD;
+      stroke-width: 3.5;
+      stroke-linecap: round;
+    }
+    .flow-underlay {
+      fill: none;
+      stroke: #BBDDF1;
+      stroke-width: 7;
+      stroke-linecap: round;
+      opacity: .14;
+    }
+    .moving-dot { filter: url(#shadowSm); }
+    .reaction-ring {
+      fill: none;
+      stroke: #F99404;
+      stroke-width: 3;
+      opacity: 0;
+      vector-effect: non-scaling-stroke;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .moving-dot, .reaction-ring, .orb-reactor, .orb-accent { display: none; }
+    }
+  </style>
+
+  <rect width="1440" height="860" fill="#FFFFFF"/>
+
+  <!-- INPUT -->
+  <g filter="url(#shadowLg)">
+    <rect x="78" y="170" width="350" height="315" rx="34" fill="#FFFFFF" stroke="#D8E4EE" stroke-width="2"/>
+    <rect x="110" y="202" width="286" height="208" rx="24" fill="url(#photoBg)"/>
+
+    <!-- Framed product photo treatment -->
+    <g filter="url(#shadowSm)">
+      <rect x="138" y="220" width="230" height="170" rx="20" fill="#FFFFFF" stroke="#CFE0EC" stroke-width="2"/>
+      <rect x="150" y="232" width="206" height="146" rx="16" fill="#F4EDE5"/>
+      <rect x="158" y="240" width="190" height="130" rx="14" fill="#EFE5D9"/>
+
+      <!-- Photo-frame hint -->
+      <path d="M170 252h24M170 252v24M336 252h-24M336 252v24M170 358h24M170 358v-24M336 358h-24M336 358v-24"
+        stroke="#B8CFDF" stroke-width="3" stroke-linecap="round"/>
+
+      <!-- Crossbody leather bag illustration -->
+      <path d="M196 286c6-24 28-41 58-41 29 0 52 15 60 40"
+        fill="none" stroke="#6B4A34" stroke-width="7" stroke-linecap="round"/>
+      <path d="M176 258c24 10 45 26 63 47"
+        fill="none" stroke="#7D5B43" stroke-width="6" stroke-linecap="round" opacity=".95"/>
+
+      <rect x="194" y="278" width="122" height="72" rx="18" fill="#8B5E3C"/>
+      <rect x="194" y="278" width="122" height="28" rx="18" fill="#A7724B"/>
+      <path d="M194 301h122v14c0 20-16 35-35 35h-52c-19 0-35-15-35-35v-14Z" fill="#7B5235"/>
+      <rect x="208" y="292" width="94" height="16" rx="8" fill="#B78358" opacity=".9"/>
+      <circle cx="255" cy="321" r="5.5" fill="#D8B06A"/>
+      <path d="M250 321h10" stroke="#6D4B2D" stroke-width="2.5" stroke-linecap="round"/>
+      <rect x="221" y="332" width="68" height="6" rx="3" fill="#9A6B45" opacity=".55"/>
+    </g>
+
+    <text x="110" y="445" fill="#00295D" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Foto produk</text>
+  </g>
+
+  <!-- INPUT → AI -->
+  <use href="#pathInputToAI" class="flow-underlay"/>
+  <use href="#pathInputToAI" class="flow"/>
+
+  <!--
+    MASTER TIMELINE = 4.8s for EVERYTHING.
+    0.00–0.40 : input signal travels to AI
+    0.38–0.56 : AI reacts / ripple
+    0.54–0.80 : primary yellow result travels out
+    0.62–0.88 : blue micro-signal 1 follows
+    0.70–0.96 : blue micro-signal 2 follows
+    0.96–1.00 : short reset pause
+  -->
+
+  <!-- Main incoming signal -->
+  <circle class="moving-dot" r="10" fill="#00295D" opacity="0">
+    <animate attributeName="opacity"
+      dur="4.8s" begin="0s" repeatCount="indefinite"
+      values="1;1;0;0"
+      keyTimes="0;.40;.405;1"/>
+    <animateMotion dur="4.8s" begin="0s" repeatCount="indefinite"
+      keyTimes="0;.40;1"
+      keyPoints="0;1;1"
+      calcMode="spline"
+      keySplines=".35 0 .2 1; 0 0 1 1">
+      <mpath href="#pathInputToAI"/>
+    </animateMotion>
+  </circle>
+
+  <!-- Small input signals, same master cycle -->
+  <circle class="moving-dot" r="5.2" fill="#2A89CD" opacity="0">
+    <animate attributeName="opacity"
+      dur="4.8s" begin="0s" repeatCount="indefinite"
+      values="0;.82;.82;0;0"
+      keyTimes="0;.08;.28;.285;1"/>
+    <animateMotion dur="4.8s" begin="0s" repeatCount="indefinite"
+      keyTimes="0;.08;.28;1"
+      keyPoints="0;0;1;1"
+      calcMode="linear">
+      <mpath href="#pathInputToAI"/>
+    </animateMotion>
+  </circle>
+
+  <circle class="moving-dot" r="4.2" fill="#2A89CD" opacity="0">
+    <animate attributeName="opacity"
+      dur="4.8s" begin="0s" repeatCount="indefinite"
+      values="0;.55;.55;0;0"
+      keyTimes="0;.18;.38;.385;1"/>
+    <animateMotion dur="4.8s" begin="0s" repeatCount="indefinite"
+      keyTimes="0;.18;.38;1"
+      keyPoints="0;0;1;1"
+      calcMode="linear">
+      <mpath href="#pathInputToAI"/>
+    </animateMotion>
+  </circle>
+
+  <!-- AI reaction: synchronized to incoming arrival -->
+  <circle class="reaction-ring" cx="710" cy="395" r="79">
+    <animate attributeName="r"
+      dur="4.8s" begin="0s" repeatCount="indefinite"
+      values="79;79;88;112;126;126"
+      keyTimes="0;.38;.43;.50;.56;1"/>
+    <animate attributeName="opacity"
+      dur="4.8s" begin="0s" repeatCount="indefinite"
+      values="0;0;.68;.30;0;0"
+      keyTimes="0;.38;.43;.51;.56;1"/>
+  </circle>
+
+  <circle class="reaction-ring" cx="710" cy="395" r="79">
+    <animate attributeName="r"
+      dur="4.8s" begin="0s" repeatCount="indefinite"
+      values="79;79;82;102;118;118"
+      keyTimes="0;.42;.46;.52;.58;1"/>
+    <animate attributeName="opacity"
+      dur="4.8s" begin="0s" repeatCount="indefinite"
+      values="0;0;.46;.20;0;0"
+      keyTimes="0;.42;.46;.53;.58;1"/>
+  </circle>
+
+  <circle class="orb-reactor" cx="710" cy="395" r="64"
+      fill="#F99404" opacity="0" filter="url(#amberGlow)">
+    <animate attributeName="opacity"
+      dur="4.8s" begin="0s" repeatCount="indefinite"
+      values="0;0;.18;.30;.10;0;0"
+      keyTimes="0;.38;.43;.48;.52;.57;1"/>
+    <animate attributeName="r"
+      dur="4.8s" begin="0s" repeatCount="indefinite"
+      values="64;64;68;74;70;64;64"
+      keyTimes="0;.38;.43;.48;.52;.57;1"/>
+  </circle>
+
+  <!-- AI orb -->
+  <g filter="url(#shadowSm)">
+    <circle cx="710" cy="395" r="79" fill="#FFFFFF" stroke="#2A89CD" stroke-width="4"/>
+    <circle cx="710" cy="395" r="57" fill="#FFF1D8"/>
+    <circle cx="710" cy="395" r="37" fill="#F99404"/>
+    <text x="710" y="405" text-anchor="middle" fill="#00295D"
+      font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="800">AI</text>
+  </g>
+
+  <circle class="orb-accent" cx="710" cy="395" r="57"
+      fill="none" stroke="#F99404" stroke-width="3" opacity="0">
+    <animate attributeName="opacity"
+      dur="4.8s" begin="0s" repeatCount="indefinite"
+      values="0;0;.9;.38;0;0"
+      keyTimes="0;.40;.45;.52;.57;1"/>
+    <animate attributeName="r"
+      dur="4.8s" begin="0s" repeatCount="indefinite"
+      values="57;57;61;66;57;57"
+      keyTimes="0;.40;.45;.52;.57;1"/>
+  </circle>
+
+  <text x="710" y="518" text-anchor="middle" fill="#00295D"
+    font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">AI menyusun listing</text>
+
+  <!-- AI → OUTPUT -->
+  <use href="#pathAIToOutput" class="flow-underlay"/>
+  <use href="#pathAIToOutput" class="flow"/>
+
+  <!-- Primary yellow signal: starts only AFTER the AI reaction -->
+  <circle class="moving-dot" r="9" fill="#F99404" opacity="0">
+    <animate attributeName="opacity"
+      dur="4.8s" begin="0s" repeatCount="indefinite"
+      values="0;0;1;1;0;0"
+      keyTimes="0;.535;.54;.80;.805;1"/>
+    <animateMotion dur="4.8s" begin="0s" repeatCount="indefinite"
+      keyTimes="0;.54;.80;1"
+      keyPoints="0;0;1;1"
+      calcMode="spline"
+      keySplines="0 0 1 1; .35 0 .2 1; 0 0 1 1">
+      <mpath href="#pathAIToOutput"/>
+    </animateMotion>
+  </circle>
+
+  <!-- Blue micro-signals: SAME LINE, fixed trailing gap -->
+  <circle class="moving-dot" r="4.8" fill="#2A89CD" opacity="0">
+    <animate attributeName="opacity"
+      dur="4.8s" begin="0s" repeatCount="indefinite"
+      values="0;0;.88;.88;0;0"
+      keyTimes="0;.615;.62;.88;.885;1"/>
+    <animateMotion dur="4.8s" begin="0s" repeatCount="indefinite"
+      keyTimes="0;.62;.88;1"
+      keyPoints="0;0;1;1"
+      calcMode="linear">
+      <mpath href="#pathAIToOutput"/>
+    </animateMotion>
+  </circle>
+
+  <circle class="moving-dot" r="4.0" fill="#2A89CD" opacity="0">
+    <animate attributeName="opacity"
+      dur="4.8s" begin="0s" repeatCount="indefinite"
+      values="0;0;.60;.60;0;0"
+      keyTimes="0;.695;.70;.96;.965;1"/>
+    <animateMotion dur="4.8s" begin="0s" repeatCount="indefinite"
+      keyTimes="0;.70;.96;1"
+      keyPoints="0;0;1;1"
+      calcMode="linear">
+      <mpath href="#pathAIToOutput"/>
+    </animateMotion>
+  </circle>
+
+  <!-- OUTPUT -->
+  <g filter="url(#shadowLg)">
+    <rect x="998" y="454" width="354" height="316" rx="34" fill="url(#listingBg)"/>
+    <text x="1038" y="500" fill="#A7CCE8"
+      font-family="Arial, Helvetica, sans-serif" font-size="13"
+      font-weight="700" letter-spacing="1.5">HASIL LISTING</text>
+
+    <!-- Title -->
+    <text x="1038" y="555" fill="#FFFFFF"
+      font-family="Arial, Helvetica, sans-serif" font-size="22"
+      font-weight="700">Tas Selempang Kulit</text>
+
+    <!-- Category -->
+    <text x="1038" y="586" fill="#A7CCE8"
+      font-family="Arial, Helvetica, sans-serif" font-size="18"
+      font-weight="700">Kategori: Fashion</text>
+
+    <!-- Description -->
+    <text x="1038" y="621" fill="#D5E2ED"
+      font-family="Arial, Helvetica, sans-serif" font-size="17">Nyaman untuk aktivitas sehari-hari.</text>
+
+    <line x1="1038" y1="652" x2="1312" y2="652" stroke="#5579A2"/>
+
+    <text x="1038" y="685" fill="#A7CCE8"
+      font-family="Arial, Helvetica, sans-serif" font-size="12">REKOMENDASI HARGA</text>
+    <text x="1038" y="728" fill="#F99404"
+      font-family="Arial, Helvetica, sans-serif" font-size="34"
+      font-weight="800">Rp62.000</text>
+
+    <g aria-hidden="true">
+      <circle cx="1287" cy="714" r="18" fill="#F99404"/>
+      <path d="M1279.5 714.5 L1284.5 719.5 L1294.5 708.5"
+        fill="none"
+        stroke="#FFFFFF"
+        stroke-width="3"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

@@ -35,23 +35,23 @@ export default function CreateListingPage() {
         </header>
         <section
           aria-labelledby="privacy-heading"
-          className="my-6 border-b border-line/70 py-4 sm:my-8"
+          className="my-4 border-b border-line/70 py-2 sm:my-5 sm:py-3"
         >
-          <div className="flex items-start gap-3">
+          <div className="flex min-h-11 items-center gap-3">
             <ShieldCheck
-              className="mt-0.5 size-5 shrink-0 text-brand"
+              className="size-5 shrink-0 text-brand"
               aria-hidden="true"
             />
-            <div>
-              <h2 id="privacy-heading" className="font-semibold text-ink">
-                Fotomu dipakai untuk membantu membuat listing.
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3">
+              <h2
+                id="privacy-heading"
+                className="text-sm font-semibold leading-6 text-ink sm:text-base"
+              >
+                Fotomu hanya digunakan untuk membantu membuat listing ini.
               </h2>
-              <p className="mt-1 text-sm leading-6 text-ink-muted">
-                Kami tidak menggunakannya untuk melatih model tanpa persetujuanmu.
-              </p>
-              <details className="mt-2 text-sm leading-6 text-ink-muted">
+              <details className="text-sm leading-6 text-ink-muted">
                 <summary className="inline-flex min-h-11 cursor-pointer items-center font-medium text-link focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand">
-                  Lihat cara data digunakan
+                  Cara data digunakan
                 </summary>
                 <ul className="mt-3 grid list-disc gap-2 pl-5">
                   <li>

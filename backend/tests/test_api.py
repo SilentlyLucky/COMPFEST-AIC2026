@@ -4,20 +4,23 @@ import json
 from datetime import date
 from pathlib import Path
 
-import main as main_module
 import pytest
+from fastapi.testclient import TestClient
+from PIL import Image
+
+import main as main_module
 from ai.category import OpenClipCategoryClassifier
 from ai.listing import SulinganVlmGenerator
 from ai.pricing import CatalogPricingService
+from ai.pricing.market_first import price_with_market_first
 from errors import ApiError
-from fastapi.testclient import TestClient
 from main import GenerationCapacity, app, get_services, parse_cors_origins
-from PIL import Image
 from schemas import (
     CategoryCode,
     CategoryPrediction,
     CopyCandidate,
     ListingMetadata,
+    MarketComparable,
     MarketEvidence,
     ProcessedImage,
     ServiceReadiness,
@@ -116,6 +119,69 @@ class FakeEmptyMarketService(FakeMarketService):
         self, metadata: ListingMetadata, category: CategoryCode
     ) -> None:
         return None
+
+
+class FakeMarketFirstService(FakeMarketService):
+    pricing_version = "market-first-catalog-v1"
+
+    def price_market_first(
+        self,
+        metadata: ListingMetadata,
+        category: CategoryCode,
+        evidence: MarketEvidence | None,
+    ):
+        return price_with_market_first(metadata, category, evidence)
+
+
+class FakeCatalogMarketFirstService(FakeMarketFirstService):
+    def __init__(self) -> None:
+        self.visual_queries: list[str | None] = []
+
+    async def find_comparables(
+        self, metadata: ListingMetadata, category: CategoryCode
+    ) -> MarketEvidence:
+        raise AssertionError("catalog capability must retrieve and price in one path")
+
+    async def price_market_first_from_catalog(
+        self,
+        metadata: ListingMetadata,
+        category: CategoryCode,
+        *,
+        visual_query: str | None = None,
+    ):
+        self.visual_queries.append(visual_query)
+        return price_with_market_first(
+            metadata,
+            category,
+            MarketEvidence(
+                median=25_000,
+                low=23_000,
+                high=28_000,
+                comparable_count=38,
+                data_as_of=TODAY,
+                confidence_score=76,
+            ),
+        )
+
+
+class FakeCatalogMarketWithPreview(FakeCatalogMarketFirstService):
+    async def price_market_first_from_catalog(
+        self,
+        metadata: ListingMetadata,
+        category: CategoryCode,
+        *,
+        visual_query: str | None = None,
+    ):
+        decision = await super().price_market_first_from_catalog(
+            metadata, category, visual_query=visual_query
+        )
+        return decision.model_copy(
+            update={
+                "comparable_preview": (
+                    MarketComparable(title="Keripik pisang contoh", price=24_000),
+                )
+            }
+        )
 
 
 class FakeSlowGenerator(FakeGenerator):
@@ -219,6 +285,261 @@ def test_generate_listing_accepts_metadata_without_market_region_code(
     assert response.json()["error"] is None
     assert FakeGenerator.calls == 1
     assert FakeClassifier.calls == 1
+
+
+def test_generate_listing_returns_market_first_details_for_advanced_pricing() -> None:
+    """The API must expose converted HPP and explicit variant estimates together."""
+    services = ListingServices(
+        generator=FakeGenerator(),
+        classifier=FakeClassifier(),
+        market=FakeMarketFirstService(),
+    )
+    metadata = valid_metadata() | {
+        "platform_fee_pct": 0,
+        "pricing": {
+            "total_hpp_idr": 120_000,
+            "purchase_unit": "kg",
+            "purchase_quantity": 3,
+            "sale_content": 250,
+            "sale_unit": "g",
+            "output_unit_label": "bag",
+            "colors": ["red", "blue"],
+            "sizes": ["250 g", "500 g"],
+            "hpp_per_size_idr": {"250 g": 11_000, "500 g": 20_000},
+            "grades": ["regular", "premium"],
+            "annual_turnover_idr": 600_000_000,
+            "vat_registered": True,
+        },
+    }
+    app.dependency_overrides[get_services] = lambda: services
+    try:
+        with TestClient(app) as test_client:
+            response = test_client.post(
+                "/v1/listings/generate",
+                files={"image": ("product.png", make_image_bytes(), "image/png")},
+                data={"metadata": json.dumps(metadata)},
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    body = response.json()["data"]
+    details = body["listing"]["price"]["pricing_details"]
+    assert details["hpp_per_unit_idr"] == 11_000
+    assert details["sale_unit"] == "bag"
+    assert response.json()["meta"]["price_model_version"] == "market-first-catalog-v1"
+    assert {item["label"] for item in details["variant_prices"]} == {
+        "red",
+        "blue",
+        "250 g",
+        "500 g",
+        "regular",
+        "premium",
+    }
+    assert "PLATFORM_FEE_DEFAULTED" in body["warnings"]
+
+
+def test_catalog_market_first_keeps_no_pricing_response_shape_additive() -> None:
+    """Basic catalog users receive modern pricing without an unexpected details field."""
+    market = FakeCatalogMarketFirstService()
+    services = ListingServices(
+        generator=FakeGenerator(),
+        classifier=FakeClassifier(),
+        market=market,
+    )
+    metadata = valid_metadata() | {"platform_fee_pct": 0}
+    app.dependency_overrides[get_services] = lambda: services
+    try:
+        with TestClient(app) as test_client:
+            response = test_client.post(
+                "/v1/listings/generate",
+                files={"image": ("product.png", make_image_bytes(), "image/png")},
+                data={"metadata": json.dumps(metadata)},
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body["data"]["listing"]["price"]) == {
+        "currency",
+        "recommended",
+        "market_interval",
+        "viable_floor",
+        "alignment",
+        "comparable_count",
+        "data_as_of",
+    }
+    assert body["data"]["listing"]["price"]["recommended"] == 24_900
+    assert body["meta"]["price_model_version"] == "market-first-catalog-v1"
+    assert "PLATFORM_FEE_NOT_PROVIDED" in body["data"]["warnings"]
+    assert "PLATFORM_FEE_DEFAULTED" not in body["data"]["warnings"]
+    assert len(market.visual_queries) == 1
+    assert market.visual_queries[0] is not None
+    assert len(market.visual_queries[0]) <= 240
+    assert "250" not in market.visual_queries[0]
+    assert "tokopedia" not in market.visual_queries[0]
+
+
+def test_catalog_preview_is_an_additive_price_response_field() -> None:
+    services = ListingServices(
+        generator=FakeGenerator(),
+        classifier=FakeClassifier(),
+        market=FakeCatalogMarketWithPreview(),
+    )
+    app.dependency_overrides[get_services] = lambda: services
+    try:
+        with TestClient(app) as test_client:
+            response = test_client.post(
+                "/v1/listings/generate",
+                files={"image": ("product.png", make_image_bytes(), "image/png")},
+                data={"metadata": json.dumps(valid_metadata())},
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["data"]["listing"]["price"]["comparable_preview"] == [
+        {"title": "Keripik pisang contoh", "price": 24_000}
+    ]
+
+
+def test_advanced_pricing_rejects_hpp_map_for_an_unknown_size(
+    client: TestClient,
+) -> None:
+    """A misspelled variant label must fail instead of receiving a guessed price."""
+    metadata = valid_metadata() | {
+        "pricing": {
+            "total_hpp_idr": 12_000,
+            "sizes": ["250 g"],
+            "hpp_per_size_idr": {"500 g": 20_000},
+        }
+    }
+
+    response = client.post(
+        "/v1/listings/generate",
+        files={"image": ("product.png", make_image_bytes(), "image/png")},
+        data={"metadata": json.dumps(metadata)},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["field"] == "pricing"
+
+
+def test_advanced_pricing_rejects_incompatible_content_units(
+    client: TestClient,
+) -> None:
+    """Content conversion must fail as metadata validation, not a server error."""
+    metadata = valid_metadata() | {
+        "pricing": {
+            "total_hpp_idr": 12_000,
+            "purchase_unit": "kg",
+            "purchase_quantity": 1,
+            "sale_content": 1,
+            "sale_unit": "pcs",
+        }
+    }
+
+    response = client.post(
+        "/v1/listings/generate",
+        files={"image": ("product.png", make_image_bytes(), "image/png")},
+        data={"metadata": json.dumps(metadata)},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "METADATA_INVALID"
+    assert response.json()["error"]["field"] == "pricing"
+
+
+@pytest.mark.parametrize("platform", ["tokopedia", "shopee"])
+def test_advanced_pricing_rejects_unsafe_effective_deductions(
+    client: TestClient, platform: str
+) -> None:
+    """Default marketplace fees, tax, and VAT must not escape as a 500 error."""
+    metadata = valid_metadata() | {
+        "platform": platform,
+        "platform_fee_pct": 0,
+        "target_margin_pct": 80,
+        "pricing": {
+            "annual_turnover_idr": 500_000_000,
+            "vat_registered": True,
+        },
+    }
+
+    response = client.post(
+        "/v1/listings/generate",
+        files={"image": ("product.png", make_image_bytes(), "image/png")},
+        data={"metadata": json.dumps(metadata)},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "METADATA_INVALID"
+    assert response.json()["error"]["field"] == "pricing"
+
+
+def test_legacy_shopee_high_margin_without_pricing_remains_valid(
+    client: TestClient,
+) -> None:
+    """Effective default-tariff validation applies only to the opt-in pricing block."""
+    metadata = valid_metadata() | {
+        "platform": "shopee",
+        "platform_fee_pct": 0,
+        "target_margin_pct": 80,
+    }
+
+    response = client.post(
+        "/v1/listings/generate",
+        files={"image": ("product.png", make_image_bytes(), "image/png")},
+        data={"metadata": json.dumps(metadata)},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["error"] is None
+
+
+@pytest.mark.parametrize(
+    ("pricing", "field"),
+    [
+        (
+            {"sizes": ["250 g"], "hpp_per_size_idr": {"250 g": "12000"}},
+            "pricing.hpp_per_size_idr.250 g",
+        ),
+        (
+            {"sizes": ["250 g"], "hpp_per_size_idr": {"250 g": 12_000.0}},
+            "pricing.hpp_per_size_idr.250 g",
+        ),
+        (
+            {"sizes": ["250 g"], "hpp_per_size_idr": {"250 g": True}},
+            "pricing.hpp_per_size_idr.250 g",
+        ),
+        (
+            {"grades": ["premium"], "hpp_per_grade_idr": {"premium": "12000"}},
+            "pricing.hpp_per_grade_idr.premium",
+        ),
+        (
+            {"grades": ["premium"], "hpp_per_grade_idr": {"premium": 12_000.0}},
+            "pricing.hpp_per_grade_idr.premium",
+        ),
+        (
+            {"grades": ["premium"], "hpp_per_grade_idr": {"premium": True}},
+            "pricing.hpp_per_grade_idr.premium",
+        ),
+        ({"vat_registered": "true"}, "pricing.vat_registered"),
+        ({"vat_registered": 1}, "pricing.vat_registered"),
+    ],
+)
+def test_advanced_pricing_rejects_nested_coercion(
+    client: TestClient, pricing: dict[str, object], field: str
+) -> None:
+    """Nested pricing types must remain strict instead of silently coercing JSON."""
+    response = client.post(
+        "/v1/listings/generate",
+        files={"image": ("product.png", make_image_bytes(), "image/png")},
+        data={"metadata": json.dumps(valid_metadata() | {"pricing": pricing})},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["field"] == field
 
 
 @pytest.mark.parametrize("product_type", ["missing", None, "   "])
@@ -491,6 +812,7 @@ def test_default_services_use_only_packaged_production_components() -> None:
     assert isinstance(services.classifier, OpenClipCategoryClassifier)
     assert isinstance(services.market, CatalogPricingService)
     assert services.classifier is not services.market
+    assert services.market.pricing_version == "market-first-catalog-v1"
     assert main_module.ADAPTER_PATH.parent == (
         Path(__file__).parents[1] / "ai" / "listing"
     )

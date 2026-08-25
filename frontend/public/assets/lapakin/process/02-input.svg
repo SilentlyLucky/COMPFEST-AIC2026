@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1050" height="560" viewBox="0 0 1050 560" role="img">
+
+<defs>
+  <filter id="shadow" x="-25%" y="-25%" width="150%" height="150%">
+    <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#00295D" flood-opacity=".08"/>
+  </filter>
+  <filter id="smallShadow" x="-30%" y="-30%" width="160%" height="160%">
+    <feDropShadow dx="0" dy="4" stdDeviation="7" flood-color="#00295D" flood-opacity=".09"/>
+  </filter>
+  <linearGradient id="listingBg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#00295D"/>
+    <stop offset="100%" stop-color="#0C3D78"/>
+  </linearGradient>
+</defs>
+
+<style>
+  .t { font-family: Arial, Helvetica, sans-serif; }
+  .line { fill:none; stroke:#2A89CD; stroke-width:3.2; stroke-linecap:round; }
+  .under { fill:none; stroke:#CFE4F2; stroke-width:7; stroke-linecap:round; opacity:.28; }
+  .motion { filter:url(#smallShadow); }
+  @media (prefers-reduced-motion: reduce) {
+    .anim { display:none; }
+    .static { opacity:1 !important; }
+  }
+</style>
+
+<rect width="1050" height="560" fill="#fff"/>
+<defs>
+  <path id="ip1" d="M350 195 C450 195 480 245 560 270"/>
+  <path id="ip2" d="M375 405 C455 405 490 340 560 310"/>
+</defs>
+
+
+<g filter="url(#shadow)">
+  <rect x="70" y="70" width="280" height="260" rx="28" fill="#fff" stroke="#D5E6F2" stroke-width="2"/>
+  <text x="102" y="110" class="t" fill="#00295D" font-size="22" font-weight="700">Foto produk</text>
+  <rect x="102" y="133" width="216" height="160" rx="18" fill="#F2E9DE"/>
+  <path d="M118 149h18M118 149v18M302 149h-18M302 149v18M118 277h18M118 277v-18M302 277h-18M302 277v-18"
+        stroke="#AFCBDD" stroke-width="3" stroke-linecap="round"/>
+  <g transform="translate(210 215) scale(1.1)">
+<g>
+  <path d="M-42 -22 C-34 -55 5 -73 45 -49" fill="none" stroke="#6B4A34" stroke-width="7" stroke-linecap="round"/>
+  <path d="M-65 -55 C-33 -44 -8 -24 11 0" fill="none" stroke="#7D5B43" stroke-width="6" stroke-linecap="round"/>
+  <rect x="-52" y="-24" width="104" height="66" rx="16" fill="#8B5E3C"/>
+  <rect x="-52" y="-24" width="104" height="25" rx="16" fill="#A7724B"/>
+  <path d="M-52 0h104v12c0 17-14 30-30 30h-44c-16 0-30-13-30-30V0Z" fill="#7B5235"/>
+  <rect x="-39" y="-11" width="78" height="14" rx="7" fill="#B78358"/>
+  <circle cx="0" cy="18" r="5" fill="#D8B06A"/>
+</g>
+</g>
+</g>
+
+
+<g filter="url(#shadow)">
+  <rect x="70" y="350" width="300" height="180" rx="28"
+    fill="#FFFFFF" stroke="#D5E6F2" stroke-width="2"/>
+  <text x="102" y="390" class="t"
+    fill="#00295D" font-size="22" font-weight="700">Deskripsi singkat</text>
+
+  <g transform="translate(110 434)">
+    <circle r="15" fill="#2A89CD"/>
+    <path d="M-8 -3 H8 L6 -8 H-6 Z" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linejoin="round"/>
+    <path d="M-6 -2 V7 H6 V-2" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M-2 7 V2 H2 V7" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M-8 -3 C-7 -1 -5 -1 -4 -3 C-3 -1 -1 -1 0 -3 C1 -1 3 -1 4 -3 C5 -1 7 -1 8 -3"
+      fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round"/>
+  </g>
+  <text x="142" y="439" class="t" fill="#0B376D" font-size="15.5" font-weight="700">Platform</text>
+  <text x="255" y="439" class="t" fill="#52647A" font-size="15.5">Shopee</text>
+
+  <g transform="translate(110 486)">
+    <circle r="15" fill="#2A89CD"/>
+    <path d="M-7 -2 L1 -10 H8 V-3 L0 5 Z" fill="none" stroke="#FFFFFF" stroke-width="1.8"
+      stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="4.7" cy="-5.7" r="1.5" fill="#FFFFFF"/>
+  </g>
+  <text x="142" y="491" class="t" fill="#0B376D" font-size="15.5" font-weight="700">Harga produksi</text>
+  <text x="286" y="491" class="t" fill="#52647A" font-size="15.5">Rp44.000</text>
+</g>
+
+
+<use href="#ip1" class="under"/><use href="#ip1" class="line"/>
+<use href="#ip2" class="under"/><use href="#ip2" class="line"/>
+<circle class="anim motion" r="7" fill="#00295D" opacity="0">
+  <animate attributeName="opacity" dur="4.8s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.08;.35;.39;1"/>
+  <animateMotion dur="4.8s" repeatCount="indefinite" keyTimes="0;.08;.35;1" keyPoints="0;0;1;1"><mpath href="#ip1"/></animateMotion>
+</circle>
+<circle class="anim motion" r="5" fill="#2A89CD" opacity="0">
+  <animate attributeName="opacity" dur="4.8s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;.16;.18;.42;.46;1"/>
+  <animateMotion dur="4.8s" repeatCount="indefinite" keyTimes="0;.18;.42;1" keyPoints="0;0;1;1"><mpath href="#ip2"/></animateMotion>
+</circle>
+
+<g filter="url(#smallShadow)">
+  <circle cx="650" cy="285" r="79" fill="#FFFFFF" stroke="#2A89CD" stroke-width="4"/>
+  <circle cx="650" cy="285" r="57" fill="#FFF1D8"/>
+  <circle cx="650" cy="285" r="37" fill="#F99404"/>
+  <text x="650" y="294" text-anchor="middle" class="t" fill="#00295D" font-size="26" font-weight="800">AI</text>
+</g>
+<circle class="anim" cx="650" cy="285" r="57" fill="none" stroke="#F99404" stroke-width="3" opacity="0">
+  <animate attributeName="r" dur="5.4s" repeatCount="indefinite" values="57;57;57;66;76;57" keyTimes="0;.30;.36;.44;.52;1"/>
+  <animate attributeName="opacity" dur="5.4s" repeatCount="indefinite" values="0;0;.8;.35;0;0" keyTimes="0;.30;.36;.46;.52;1"/>
+</circle>
+
+</svg>

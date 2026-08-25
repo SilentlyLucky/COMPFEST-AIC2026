@@ -43,6 +43,19 @@ const PRICING_FIELDS: ListingField[] = [
   "otherCost",
   "targetMargin",
   "platformFee",
+  "purchaseUnit",
+  "purchaseQuantity",
+  "saleContent",
+  "saleUnit",
+  "outputUnitCount",
+  "outputUnitLabel",
+  "colors",
+  "sizes",
+  "hppPerSize",
+  "grades",
+  "hppPerGrade",
+  "annualTurnover",
+  "vatRegistered",
 ];
 
 const API_FIELD_MAP: Record<string, ListingField> = {
@@ -59,12 +72,86 @@ const API_FIELD_MAP: Record<string, ListingField> = {
   other_cost_idr: "otherCost",
   target_margin_pct: "targetMargin",
   platform_fee_pct: "platformFee",
+  pricing: "targetMargin",
+  total_hpp_idr: "productionCost",
+  purchase_unit: "purchaseUnit",
+  purchase_quantity: "purchaseQuantity",
+  sale_content: "saleContent",
+  sale_unit: "saleUnit",
+  output_unit_count: "outputUnitCount",
+  output_unit_label: "outputUnitLabel",
+  colors: "colors",
+  sizes: "sizes",
+  hpp_per_size_idr: "hppPerSize",
+  grades: "grades",
+  hpp_per_grade_idr: "hppPerGrade",
+  annual_turnover_idr: "annualTurnover",
+  vat_registered: "vatRegistered",
 };
 
-function mapApiField(field: string | null): ListingField | null {
-  if (!field) return null;
+const HPP_FIELD_SEGMENTS = ["hpp_per_size_idr", "hpp_per_grade_idr"] as const;
+const API_FIELD_SEGMENT_ORDER = [
+  ...HPP_FIELD_SEGMENTS,
+  ...Object.keys(API_FIELD_MAP).filter(
+    (segment) => segment !== "pricing" && !HPP_FIELD_SEGMENTS.includes(segment as (typeof HPP_FIELD_SEGMENTS)[number]),
+  ),
+];
+const TAX_FIELD_SEGMENTS = new Set(["annual_turnover_idr", "vat_registered"]);
+
+const PRICING_TAX_ERROR_PATTERNS = {
+  annualTurnover: /(?:annual[\s_-]*turnover|turnover|omzet|pajak|tax)/i,
+  vatRegistered: /(?:vat|ppn|pkp)/i,
+} as const;
+
+function mappedFieldsForSegments(segments: string[]): ListingField[] {
+  return [...new Set(segments.map((segment) => API_FIELD_MAP[segment]))];
+}
+
+function mappedFieldsInPath(field: string): ListingField[] {
+  const pathSegments = new Set(field.split("."));
+  return mappedFieldsForSegments(
+    API_FIELD_SEGMENT_ORDER.filter((segment) => pathSegments.has(segment)),
+  );
+}
+
+function mappedFieldsInPricingMessage(message: string): ListingField[] {
+  const normalizedMessage = message.toLocaleLowerCase();
+  const hppSegments = HPP_FIELD_SEGMENTS.filter((segment) =>
+    normalizedMessage.includes(segment),
+  );
+  if (hppSegments.length > 0) return mappedFieldsForSegments([...hppSegments]);
+
+  const detailSegments = API_FIELD_SEGMENT_ORDER.filter(
+    (segment) =>
+      !TAX_FIELD_SEGMENTS.has(segment) && normalizedMessage.includes(segment),
+  );
+  return mappedFieldsForSegments(detailSegments);
+}
+
+export function mapApiErrorFields(
+  field: string | null,
+  message = "",
+): ListingField[] {
+  if (!field) return [];
+  const pathFields = mappedFieldsInPath(field);
   const segment = field.split(".").at(-1);
-  return segment ? (API_FIELD_MAP[segment] ?? null) : null;
+  if (!segment) return [];
+
+  if (segment === "pricing") {
+    const messageFields = mappedFieldsInPricingMessage(message);
+    if (messageFields.length > 0) return messageFields;
+
+    const mappedFields: ListingField[] = ["targetMargin"];
+    if (PRICING_TAX_ERROR_PATTERNS.annualTurnover.test(message)) {
+      mappedFields.push("annualTurnover");
+    }
+    if (PRICING_TAX_ERROR_PATTERNS.vatRegistered.test(message)) {
+      mappedFields.push("vatRegistered");
+    }
+    return mappedFields;
+  }
+
+  return pathFields;
 }
 
 function RequestError({
@@ -274,10 +361,16 @@ export function ListingWizard() {
         );
       }
 
-      const field = mapApiField(nextError.field);
-      if (field) {
-        setErrors((current) => ({ ...current, [field]: nextError.message }));
-        focusField(field);
+      const fields = mapApiErrorFields(nextError.field, nextError.message);
+      if (fields.length > 0) {
+        setErrors((current) => {
+          const next = { ...current };
+          fields.forEach((field) => {
+            next[field] = nextError.message;
+          });
+          return next;
+        });
+        focusField(fields[0]);
       }
       setRequestError(nextError);
     } finally {
@@ -315,17 +408,17 @@ export function ListingWizard() {
         <h1
           ref={stageHeadingRef}
           tabIndex={-1}
-          className="max-w-5xl text-balance text-[clamp(2rem,3.8vw,4rem)] font-semibold leading-[1.06] tracking-[-0.05em] text-ink focus:outline-2 focus:outline-offset-4 focus:outline-brand"
+          className={`max-w-5xl text-balance font-semibold leading-[1.06] tracking-[-0.05em] text-ink focus:outline-2 focus:outline-offset-4 focus:outline-brand ${step === 2 ? "text-[clamp(2rem,3.8vw,3rem)]" : "text-[clamp(2rem,3.8vw,4rem)]"}`}
         >
           {step === 1 && "Ceritakan produkmu lewat foto dan fakta."}
-          {step === 2 && "Periksa hasil dan tingkat keyakinannya."}
+          {step === 2 && "Periksa hasil listing"}
           {step === 3 && "Salin hasil ke kanal jualmu."}
         </h1>
         <p className="mt-4 max-w-3xl text-base leading-7 text-ink-muted sm:text-lg sm:leading-8">
           {step === 1 &&
             "Cukup isi yang benar-benar kamu tahu. LAPAKIN akan membantu menyusun sisanya."}
           {step === 2 &&
-            "Edit judul dan deskripsi sebelum melanjutkan. Harga dan confidence dapat kosong bila bukti belum cukup."}
+            "Tinjau hasil AI dan ubah jika diperlukan sebelum melanjutkan."}
           {step === 3 &&
             "Gunakan hasil ini sebagai draf. Periksa kembali sebelum menerbitkannya di marketplace."}
         </p>

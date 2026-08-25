@@ -10,6 +10,13 @@ from pathlib import Path
 from typing import Annotated, NoReturn
 from urllib.parse import urlsplit
 
+from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import ValidationError
+from starlette.exceptions import HTTPException
+
 from ai.category import (
     DEFAULT_ARTIFACT_PATH,
     DEFAULT_ENCODER_PATH,
@@ -18,13 +25,8 @@ from ai.category import (
 from ai.listing import SulinganVlmGenerator
 from ai.pricing import CatalogPricingService
 from errors import ApiError
-from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
-from fastapi.exceptions import RequestValidationError
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from image_processing import process_uploaded_image
 from orchestrator import ListingOrchestrator
-from pydantic import ValidationError
 from schemas import (
     BaseResponseMeta,
     ErrorDetail,
@@ -38,7 +40,6 @@ from schemas import (
     PredictPriceRequest,
 )
 from services import ListingServices
-from starlette.exceptions import HTTPException
 
 API_VERSION = "v1"
 REQUEST_TIMEOUT_SECONDS = 45
@@ -283,7 +284,7 @@ def _parse_metadata(raw_metadata: str) -> ListingMetadata:
         first_location = (
             validation_errors[0].get("loc", ()) if validation_errors else ()
         )
-        field = str(first_location[0]) if first_location else "metadata"
+        field = ".".join(str(part) for part in first_location) or "metadata"
         raise ApiError(
             status_code=400 if invalid_json else 422,
             code="INVALID_METADATA_JSON" if invalid_json else "METADATA_INVALID",

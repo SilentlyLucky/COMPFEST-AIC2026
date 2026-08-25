@@ -1,0 +1,261 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="700" viewBox="0 0 1400 700" role="img">
+
+<defs>
+  <filter id="shadow" x="-25%" y="-25%" width="150%" height="150%">
+    <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#00295D" flood-opacity=".08"/>
+  </filter>
+  <filter id="smallShadow" x="-30%" y="-30%" width="160%" height="160%">
+    <feDropShadow dx="0" dy="4" stdDeviation="7" flood-color="#00295D" flood-opacity=".09"/>
+  </filter>
+  <linearGradient id="listingBg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#00295D"/>
+    <stop offset="100%" stop-color="#0C3D78"/>
+  </linearGradient>
+</defs>
+
+<style>
+  .t { font-family: Arial, Helvetica, sans-serif; }
+  .line { fill:none; stroke:#2A89CD; stroke-width:3.2; stroke-linecap:round; }
+  .under { fill:none; stroke:#CFE4F2; stroke-width:7; stroke-linecap:round; opacity:.28; }
+  .motion { filter:url(#smallShadow); }
+  @media (prefers-reduced-motion: reduce) {
+    .anim { display:none; }
+    .static { opacity:1 !important; }
+    .line, .under { opacity:1 !important; stroke-dasharray:none !important; stroke-dashoffset:0 !important; }
+  }
+</style>
+
+<rect width="1400" height="700" fill="#fff"/>
+<defs>
+  <path id="fp1" d="M340 245 C430 245 455 290 520 315"/>
+  <path id="fp2" d="M360 445 C445 445 465 365 520 340"/>
+  <path id="fp3" d="M679 330 C800 330 855 330 930 330"/>
+</defs>
+
+
+<g filter="url(#shadow)">
+  <rect x="60" y="105" width="280" height="260" rx="28" fill="#fff" stroke="#D5E6F2" stroke-width="2"/>
+  <text x="92" y="145" class="t" fill="#00295D" font-size="22" font-weight="700">Foto produk</text>
+  <rect x="92" y="168" width="216" height="160" rx="18" fill="#F2E9DE"/>
+  <path d="M108 184h18M108 184v18M292 184h-18M292 184v18M108 312h18M108 312v-18M292 312h-18M292 312v-18"
+        stroke="#AFCBDD" stroke-width="3" stroke-linecap="round"/>
+  <g transform="translate(200 250) scale(1.1)">
+<g>
+  <path d="M-42 -22 C-34 -55 5 -73 45 -49" fill="none" stroke="#6B4A34" stroke-width="7" stroke-linecap="round"/>
+  <path d="M-65 -55 C-33 -44 -8 -24 11 0" fill="none" stroke="#7D5B43" stroke-width="6" stroke-linecap="round"/>
+  <rect x="-52" y="-24" width="104" height="66" rx="16" fill="#8B5E3C"/>
+  <rect x="-52" y="-24" width="104" height="25" rx="16" fill="#A7724B"/>
+  <path d="M-52 0h104v12c0 17-14 30-30 30h-44c-16 0-30-13-30-30V0Z" fill="#7B5235"/>
+  <rect x="-39" y="-11" width="78" height="14" rx="7" fill="#B78358"/>
+  <circle cx="0" cy="18" r="5" fill="#D8B06A"/>
+</g>
+</g>
+</g>
+
+
+<g filter="url(#shadow)">
+  <rect x="60" y="395" width="300" height="180" rx="28"
+    fill="#FFFFFF" stroke="#D5E6F2" stroke-width="2"/>
+  <text x="92" y="435" class="t"
+    fill="#00295D" font-size="22" font-weight="700">Deskripsi singkat</text>
+
+  <g transform="translate(100 479)">
+    <circle r="15" fill="#2A89CD"/>
+    <path d="M-8 -3 H8 L6 -8 H-6 Z" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linejoin="round"/>
+    <path d="M-6 -2 V7 H6 V-2" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M-2 7 V2 H2 V7" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M-8 -3 C-7 -1 -5 -1 -4 -3 C-3 -1 -1 -1 0 -3 C1 -1 3 -1 4 -3 C5 -1 7 -1 8 -3"
+      fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round"/>
+  </g>
+  <text x="132" y="484" class="t" fill="#0B376D" font-size="15.5" font-weight="700">Platform</text>
+  <text x="245" y="484" class="t" fill="#52647A" font-size="15.5">Shopee</text>
+
+  <g transform="translate(100 531)">
+    <circle r="15" fill="#2A89CD"/>
+    <path d="M-7 -2 L1 -10 H8 V-3 L0 5 Z" fill="none" stroke="#FFFFFF" stroke-width="1.8"
+      stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="4.7" cy="-5.7" r="1.5" fill="#FFFFFF"/>
+  </g>
+  <text x="132" y="536" class="t" fill="#0B376D" font-size="15.5" font-weight="700">Harga produksi</text>
+  <text x="276" y="536" class="t" fill="#52647A" font-size="15.5">Rp44.000</text>
+</g>
+
+
+
+<!-- fp1: hidden until its signal starts, then draws with the moving dot -->
+<path d="M340 245 C430 245 455 290 520 315" class="under"
+  fill="none"
+  stroke-dasharray="196.07 196.07"
+  stroke-dashoffset="196.07"
+  opacity="0">
+  <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite"
+    values="0;0;1;1;0"
+    keyTimes="0;.0584;.0591;.985;1"/>
+  <animate attributeName="stroke-dashoffset" dur="7.4s" repeatCount="indefinite"
+    values="196.07;196.07;0;0;196.07"
+    keyTimes="0;.0584;.2043;.985;1"/>
+</path>
+<path d="M340 245 C430 245 455 290 520 315" class="line"
+  fill="none"
+  stroke-dasharray="196.07 196.07"
+  stroke-dashoffset="196.07"
+  opacity="0">
+  <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite"
+    values="0;0;1;1;0"
+    keyTimes="0;.0584;.0591;.985;1"/>
+  <animate attributeName="stroke-dashoffset" dur="7.4s" repeatCount="indefinite"
+    values="196.07;196.07;0;0;196.07"
+    keyTimes="0;.0584;.2043;.985;1"/>
+</path>
+
+<!-- fp2: hidden until its signal starts, then draws with the moving dot -->
+<path d="M360 445 C445 445 465 365 520 340" class="under"
+  fill="none"
+  stroke-dasharray="197.23 197.23"
+  stroke-dashoffset="197.23"
+  opacity="0">
+  <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite"
+    values="0;0;1;1;0"
+    keyTimes="0;.1241;.1248;.985;1"/>
+  <animate attributeName="stroke-dashoffset" dur="7.4s" repeatCount="indefinite"
+    values="197.23;197.23;0;0;197.23"
+    keyTimes="0;.1241;.2627;.985;1"/>
+</path>
+<path d="M360 445 C445 445 465 365 520 340" class="line"
+  fill="none"
+  stroke-dasharray="197.23 197.23"
+  stroke-dashoffset="197.23"
+  opacity="0">
+  <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite"
+    values="0;0;1;1;0"
+    keyTimes="0;.1241;.1248;.985;1"/>
+  <animate attributeName="stroke-dashoffset" dur="7.4s" repeatCount="indefinite"
+    values="197.23;197.23;0;0;197.23"
+    keyTimes="0;.1241;.2627;.985;1"/>
+</path>
+<circle class="anim motion" r="7" fill="#00295D" opacity="0">
+  <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.0584;.2043;.2335;1"/>
+  <animateMotion dur="7.4s" repeatCount="indefinite" keyTimes="0;.0584;.2043;1" keyPoints="0;0;1;1"><mpath href="#fp1"/></animateMotion>
+</circle>
+<circle class="anim motion" r="5" fill="#2A89CD" opacity="0">
+  <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;.1095;.1241;.2627;.2919;1"/>
+  <animateMotion dur="7.4s" repeatCount="indefinite" keyTimes="0;.1241;.2627;1" keyPoints="0;0;1;1"><mpath href="#fp2"/></animateMotion>
+</circle>
+
+
+<g filter="url(#smallShadow)">
+  <circle cx="600" cy="330" r="79" fill="#FFFFFF" stroke="#2A89CD" stroke-width="4"/>
+  <circle cx="600" cy="330" r="57" fill="#FFF1D8"/>
+  <circle cx="600" cy="330" r="37" fill="#F99404"/>
+  <text x="600" y="339" text-anchor="middle" class="t" fill="#00295D" font-size="26" font-weight="800">AI</text>
+</g>
+<circle class="anim" cx="600" cy="330" r="57" fill="none" stroke="#F99404" stroke-width="3" opacity="0">
+  <animate attributeName="r" dur="7.4s" repeatCount="indefinite" values="57;57;57;66;76;57" keyTimes="0;.2189;.2627;.3211;.3784;1"/>
+  <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite" values="0;0;.8;.35;0;0" keyTimes="0;.2189;.2627;.3357;.3784;1"/>
+</circle>
+
+
+
+<!-- fp3: hidden until its signal starts, then draws with the moving dot -->
+<path d="M679 330 C800 330 855 330 930 330" class="under"
+  fill="none"
+  stroke-dasharray="251.00 251.00"
+  stroke-dashoffset="251.00"
+  opacity="0">
+  <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite"
+    values="0;0;1;1;0"
+    keyTimes="0;.3357;.3364;.985;1"/>
+  <animate attributeName="stroke-dashoffset" dur="7.4s" repeatCount="indefinite"
+    values="251.00;251.00;0;0;251.00"
+    keyTimes="0;.3357;.4811;.985;1"/>
+</path>
+<path d="M679 330 C800 330 855 330 930 330" class="line"
+  fill="none"
+  stroke-dasharray="251.00 251.00"
+  stroke-dashoffset="251.00"
+  opacity="0">
+  <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite"
+    values="0;0;1;1;0"
+    keyTimes="0;.3357;.3364;.985;1"/>
+  <animate attributeName="stroke-dashoffset" dur="7.4s" repeatCount="indefinite"
+    values="251.00;251.00;0;0;251.00"
+    keyTimes="0;.3357;.4811;.985;1"/>
+</path>
+<circle class="anim motion" r="8" fill="#F99404" opacity="0">
+  <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite" values="0;0;0;1;1;0;0" keyTimes="0;.2703;.3211;.3357;.4811;.5108;1"/>
+  <animateMotion dur="7.4s" repeatCount="indefinite" keyTimes="0;.3357;.4811;1" keyPoints="0;0;1;1"><mpath href="#fp3"/></animateMotion>
+</circle>
+
+
+<!-- The result card and its heading stay present while the generated fields reveal. -->
+<g filter="url(#shadow)">
+  <rect class="static" x="930" y="118" width="410" height="455" rx="30" fill="url(#listingBg)" opacity="1"/>
+  <text x="970" y="158" class="static t" fill="#A8CCE7" font-size="14.5" font-weight="700" letter-spacing="1.2" opacity="1">
+    HASIL LISTING
+  </text>
+  <g class="anim output-activation">
+  <g opacity="0">
+    <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite"
+      values="0;0;0;0;1;1" keyTimes="0;.4670;.5108;.5400;.5692;1"/>
+    <rect x="970" y="185" width="105" height="92" rx="15" fill="#F2E9DE"/>
+    <g transform="translate(1022 232) scale(.54)">
+<g>
+  <path d="M-42 -22 C-34 -55 5 -73 45 -49" fill="none" stroke="#6B4A34" stroke-width="7" stroke-linecap="round"/>
+  <path d="M-65 -55 C-33 -44 -8 -24 11 0" fill="none" stroke="#7D5B43" stroke-width="6" stroke-linecap="round"/>
+  <rect x="-52" y="-24" width="104" height="66" rx="16" fill="#8B5E3C"/>
+  <rect x="-52" y="-24" width="104" height="25" rx="16" fill="#A7724B"/>
+  <path d="M-52 0h104v12c0 17-14 30-30 30h-44c-16 0-30-13-30-30V0Z" fill="#7B5235"/>
+  <rect x="-39" y="-11" width="78" height="14" rx="7" fill="#B78358"/>
+  <circle cx="0" cy="18" r="5" fill="#D8B06A"/>
+</g>
+</g>
+  </g>
+  <text x="1100" y="210" class="t" fill="#fff" font-size="22" font-weight="700" opacity="0">
+    Tas Selempang Kulit
+    <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite" values="0;0;0;0;1;1" keyTimes="0;.4811;.5254;.5546;.5838;1"/>
+  </text>
+  <text x="1100" y="239" class="t" fill="#A8CCE7" font-size="15.5" font-weight="700" opacity="0">
+    Kategori: Fashion
+    <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite" values="0;0;0;0;1;1" keyTimes="0;.4962;.5400;.5692;.5984;1"/>
+  </text>
+  <text x="970" y="318" class="t" fill="#D5E2ED" font-size="16.5" opacity="0">
+    Nyaman untuk aktivitas sehari-hari.
+    <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite" values="0;0;0;0;1;1" keyTimes="0;.5108;.5546;.5838;.6130;1"/>
+  </text>
+  <line x1="970" y1="350" x2="1300" y2="350" stroke="#5579A2" opacity="0">
+    <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite" values="0;0;0;0;1;1" keyTimes="0;.5108;.5546;.5838;.6130;1"/>
+  </line>
+  <text x="970" y="384" class="t" fill="#A8CCE7" font-size="13.5" opacity="0">
+    REKOMENDASI HARGA
+    <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite" values="0;0;0;0;1;1" keyTimes="0;.5254;.5692;.5984;.6276;1"/>
+  </text>
+  <text x="970" y="428" class="t" fill="#F99404" font-size="36" font-weight="800" opacity="0">
+    Rp62.000
+    <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite" values="0;0;0;0;1;1" keyTimes="0;.5400;.5838;.6130;.6422;1"/>
+  </text>
+  <text x="970" y="466" class="t" fill="#A8CCE7" font-size="13.5" opacity="0">
+    INTERVAL HARGA
+    <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite" values="0;0;0;0;1;1" keyTimes="0;.5400;.5838;.6130;.6422;1"/>
+  </text>
+  <text x="1080" y="466" class="t" fill="#fff" font-size="14.5" font-weight="700" opacity="0">
+    Rp48.000–Rp78.000
+    <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite" values="0;0;0;0;1;1" keyTimes="0;.5546;.5984;.6276;.6568;1"/>
+  </text>
+  <text x="970" y="502" class="t" fill="#A8CCE7" font-size="13.5" opacity="0">
+    CONFIDENCE
+    <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite" values="0;0;0;0;1;1" keyTimes="0;.5546;.5984;.6276;.6568;1"/>
+  </text>
+  <rect x="1065" y="488" width="190" height="12" rx="6" fill="#315A88" opacity="0">
+    <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite" values="0;0;0;0;1;1" keyTimes="0;.5692;.6130;.6422;.6714;1"/>
+  </rect>
+  <rect x="1065" y="488" width="165" height="12" rx="6" fill="#F99404" opacity="0">
+    <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite" values="0;0;0;0;1;1" keyTimes="0;.5692;.6130;.6422;.6714;1"/>
+  </rect>
+  <text x="1274" y="502" class="t" fill="#fff" font-size="14.5" font-weight="800" opacity="0">
+    87%
+    <animate attributeName="opacity" dur="7.4s" repeatCount="indefinite" values="0;0;0;0;1;1" keyTimes="0;.5838;.6276;.6568;.6859;1"/>
+  </text>
+  </g>
+</g>
+
+</svg>

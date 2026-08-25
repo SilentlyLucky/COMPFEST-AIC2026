@@ -1,0 +1,178 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1450" height="720" viewBox="0 0 1450 720"
+  role="img" aria-labelledby="title desc">
+<title id="title">Tiga model AI LAPAKIN</title>
+<desc id="desc">Tiga model AI LAPAKIN.</desc>
+
+<defs>
+  <filter id="shadow" x="-25%" y="-25%" width="150%" height="150%">
+    <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#00295D" flood-opacity=".08"/>
+  </filter>
+  <filter id="smallShadow" x="-30%" y="-30%" width="160%" height="160%">
+    <feDropShadow dx="0" dy="4" stdDeviation="7" flood-color="#00295D" flood-opacity=".09"/>
+  </filter>
+  <linearGradient id="listingBg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#00295D"/>
+    <stop offset="100%" stop-color="#0C3D78"/>
+  </linearGradient>
+
+  <path id="inTop" d="M249 340 H330 V158 H430"/>
+  <path id="inMid" d="M249 340 H430"/>
+  <path id="inBot" d="M249 340 H330 V522 H430"/>
+
+  <path id="outTop" d="M860 158 H940 V340 H1000"/>
+  <path id="outMid" d="M860 340 H1000"/>
+  <path id="outBot" d="M860 522 H940 V340 H1000"/>
+</defs>
+
+<style>
+  .t { font-family: Arial, Helvetica, sans-serif; }
+  .line { fill:none; stroke:#2A89CD; stroke-width:3; stroke-linecap:round; stroke-linejoin:round; }
+  .under { fill:none; stroke:#CFE4F2; stroke-width:7; stroke-linecap:round; stroke-linejoin:round; opacity:.26; }
+  .motion { filter:url(#smallShadow); }
+  @media (prefers-reduced-motion: reduce) {
+    .anim { display:none; }
+  }
+</style>
+
+<rect width="1450" height="720" fill="#FFFFFF"/>
+
+<!-- AI orb -->
+<g filter="url(#smallShadow)">
+  <circle cx="170" cy="340" r="79" fill="#FFFFFF" stroke="#2A89CD" stroke-width="4"/>
+  <circle cx="170" cy="340" r="57" fill="#FFF1D8"/>
+  <circle cx="170" cy="340" r="37" fill="#F99404"/>
+  <text x="170" y="349" text-anchor="middle" class="t" fill="#00295D" font-size="25.5" font-weight="800">AI</text>
+</g>
+
+<circle class="anim" cx="170" cy="340" r="57" fill="none" stroke="#F99404" stroke-width="3" opacity="0">
+  <animate attributeName="r" dur="5.8s" repeatCount="indefinite"
+    values="57;57;67;78;57" keyTimes="0;.12;.20;.28;1"/>
+  <animate attributeName="opacity" dur="5.8s" repeatCount="indefinite"
+    values="0;0;.7;0;0" keyTimes="0;.12;.20;.28;1"/>
+</circle>
+
+<!-- left branches -->
+<use href="#inTop" class="under"/><use href="#inTop" class="line"/>
+<use href="#inMid" class="under"/><use href="#inMid" class="line"/>
+<use href="#inBot" class="under"/><use href="#inBot" class="line"/>
+
+<circle class="anim motion" r="6" fill="#F99404">
+  <animateMotion dur="5.8s" repeatCount="indefinite" keyTimes="0;.08;.34;1" keyPoints="0;0;1;1"><mpath href="#inTop"/></animateMotion>
+  <animate attributeName="opacity" dur="5.8s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.08;.32;.35;1"/>
+</circle>
+<circle class="anim motion" r="5" fill="#2A89CD">
+  <animateMotion dur="5.8s" repeatCount="indefinite" keyTimes="0;.12;.36;1" keyPoints="0;0;1;1"><mpath href="#inMid"/></animateMotion>
+  <animate attributeName="opacity" dur="5.8s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;.10;.12;.34;.37;1"/>
+</circle>
+<circle class="anim motion" r="5" fill="#2FA45A">
+  <animateMotion dur="5.8s" repeatCount="indefinite" keyTimes="0;.16;.38;1" keyPoints="0;0;1;1"><mpath href="#inBot"/></animateMotion>
+  <animate attributeName="opacity" dur="5.8s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;.14;.16;.36;.39;1"/>
+</circle>
+
+<!-- MODEL 1 -->
+<g filter="url(#shadow)">
+  <rect x="430" y="74" width="430" height="168" rx="28" fill="#FFFDF9" stroke="#F2C36B" stroke-width="2"/>
+  <g transform="translate(492 116)">
+    <circle r="24" fill="#F99404"/>
+    <path d="M-7 -8l4 7 7-5-3 8 8 2-8 2 3 8-7-5-4 7-2-8-8 2 5-6-5-6 8 2z" fill="#FFFFFF" transform="translate(4 0)"/>
+  </g>
+  <text x="536" y="111" class="t" fill="#2B1A14" font-size="20.5" font-weight="800">Qwen2.5-VL-3B-Instruct</text>
+  <text x="536" y="137" class="t" fill="#2B1A14" font-size="20.5" font-weight="800">+ LoRA</text>
+
+  <rect x="450" y="157" width="390" height="64" rx="16" fill="#FFF7E9" stroke="#F2C36B" stroke-width="1.4"/>
+  <g transform="translate(482 189) scale(1.08)">
+    <circle r="13" fill="#F99404"/>
+    <path d="M-6 0l4 4 8-10" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="515" y="196" class="t" fill="#2B1A14" font-size="18.5" font-weight="800">Generasi judul &amp; deskripsi</text>
+</g>
+
+<!-- MODEL 2 -->
+<g filter="url(#shadow)">
+  <rect x="430" y="256" width="430" height="168" rx="28" fill="#FAFDFF" stroke="#9CCAF0" stroke-width="2"/>
+  <g transform="translate(492 298)">
+    <circle r="24" fill="#EAF4FB" stroke="#2A89CD" stroke-width="3"/>
+    <path d="M-7 -8l12 6-12 7-12-7z" fill="#2A89CD" transform="translate(6 0)"/>
+    <path d="M-7 5v9l12-6V-2" fill="#1E78B7" transform="translate(6 0)"/>
+    <path d="M17 17l10 10" stroke="#2A89CD" stroke-width="5" stroke-linecap="round"/>
+  </g>
+  <text x="536" y="293" class="t" fill="#123C73" font-size="20.5" font-weight="800">OpenCLIP ViT-B-32</text>
+  <text x="536" y="319" class="t" fill="#123C73" font-size="20.5" font-weight="800">+ LAION2B</text>
+
+  <rect x="450" y="339" width="390" height="64" rx="16" fill="#F1F7FE" stroke="#9CCAF0" stroke-width="1.4"/>
+  <g transform="translate(482 371) scale(1.08)">
+    <circle r="13" fill="#2A89CD"/>
+    <path d="M-6 0l4 4 8-10" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="515" y="378" class="t" fill="#123C73" font-size="18.5" font-weight="800">Pencarian produk pembanding</text>
+</g>
+
+<!-- MODEL 3 -->
+<g filter="url(#shadow)">
+  <rect x="430" y="438" width="430" height="168" rx="28" fill="#FBFEFC" stroke="#A8D2B3" stroke-width="2"/>
+  <g transform="translate(492 480)">
+    <rect x="-22" y="-22" width="44" height="44" rx="10" fill="#F0F8F2" stroke="#A8D2B3" stroke-width="2"/>
+    <path d="M-10 -9h18M-10 -2h15M-10 5h11" stroke="#7FB58D" stroke-width="3" stroke-linecap="round"/>
+    <path d="M6 -4l12 7-7 12-12-7z" fill="#2FA45A"/>
+    <circle cx="9" cy="1" r="2" fill="#FFFFFF"/>
+  </g>
+  <text x="536" y="487" class="t" fill="#155B33" font-size="20.5" font-weight="800">TF-IDF Catalog</text>
+
+  <rect x="450" y="521" width="390" height="64" rx="16" fill="#F2F9F4" stroke="#A8D2B3" stroke-width="1.4"/>
+  <g transform="translate(482 553) scale(1.08)">
+    <circle r="13" fill="#2FA45A"/>
+    <path d="M-6 0l4 4 8-10" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="515" y="560" class="t" fill="#155B33" font-size="18.5" font-weight="800">Pencarian harga pasar</text>
+</g>
+
+<!-- right merge -->
+<use href="#outTop" class="under"/><use href="#outTop" class="line"/>
+<use href="#outMid" class="under"/><use href="#outMid" class="line"/>
+<use href="#outBot" class="under"/><use href="#outBot" class="line"/>
+
+<circle class="anim motion" r="6" fill="#F99404">
+  <animateMotion dur="5.8s" repeatCount="indefinite" keyTimes="0;.40;.62;1" keyPoints="0;0;1;1"><mpath href="#outTop"/></animateMotion>
+  <animate attributeName="opacity" dur="5.8s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;.38;.40;.60;.63;1"/>
+</circle>
+<circle class="anim motion" r="5" fill="#2A89CD">
+  <animateMotion dur="5.8s" repeatCount="indefinite" keyTimes="0;.44;.64;1" keyPoints="0;0;1;1"><mpath href="#outMid"/></animateMotion>
+  <animate attributeName="opacity" dur="5.8s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;.42;.44;.62;.65;1"/>
+</circle>
+<circle class="anim motion" r="5" fill="#2FA45A">
+  <animateMotion dur="5.8s" repeatCount="indefinite" keyTimes="0;.48;.66;1" keyPoints="0;0;1;1"><mpath href="#outBot"/></animateMotion>
+  <animate attributeName="opacity" dur="5.8s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;.46;.48;.64;.67;1"/>
+</circle>
+
+<!-- OUTPUT -->
+<g filter="url(#shadow)">
+  <rect x="1000" y="126" width="390" height="428" rx="30" fill="url(#listingBg)"/>
+  <text x="1038" y="167" class="t" fill="#A8CCE7" font-size="14.2" font-weight="700" letter-spacing="1.2">HASIL LISTING</text>
+
+  <rect x="1038" y="194" width="100" height="88" rx="15" fill="#F2E9DE"/>
+  <g transform="translate(1088 239) scale(.52)">
+    <path d="M-42 -22 C-34 -55 5 -73 45 -49" fill="none" stroke="#6B4A34" stroke-width="7" stroke-linecap="round"/>
+    <path d="M-65 -55 C-33 -44 -8 -24 11 0" fill="none" stroke="#7D5B43" stroke-width="6" stroke-linecap="round"/>
+    <rect x="-52" y="-24" width="104" height="66" rx="16" fill="#8B5E3C"/>
+    <rect x="-52" y="-24" width="104" height="25" rx="16" fill="#A7724B"/>
+    <path d="M-52 0h104v12c0 17-14 30-30 30h-44c-16 0-30-13-30-30V0Z" fill="#7B5235"/>
+  </g>
+
+  <text x="1162" y="218" class="t" fill="#FFFFFF" font-size="21.5" font-weight="700">Tas Selempang Kulit</text>
+  <text x="1162" y="247" class="t" fill="#A8CCE7" font-size="15" font-weight="700">Kategori: Fashion</text>
+  <text x="1038" y="319" class="t" fill="#D5E2ED" font-size="15.5">Nyaman untuk aktivitas sehari-hari.</text>
+
+  <line x1="1038" y1="345" x2="1352" y2="345" stroke="#5579A2"/>
+
+  <text x="1038" y="378" class="t" fill="#A8CCE7" font-size="12.8">REKOMENDASI HARGA</text>
+  <text x="1038" y="420" class="t" fill="#F99404" font-size="34.5" font-weight="800">Rp62.000</text>
+
+  <text x="1038" y="456" class="t" fill="#A8CCE7" font-size="12.8">INTERVAL PASAR</text>
+  <text x="1162" y="456" class="t" fill="#FFFFFF" font-size="14.2" font-weight="700">Rp48.000–Rp78.000</text>
+
+  <text x="1038" y="493" class="t" fill="#A8CCE7" font-size="12.8">CONFIDENCE</text>
+  <rect x="1138" y="480" width="150" height="11" rx="5.5" fill="#315A88"/>
+  <rect x="1138" y="480" width="131" height="11" rx="5.5" fill="#F99404"/>
+  <text x="1338" y="491" text-anchor="end" class="t" fill="#FFFFFF" font-size="14.2" font-weight="800">87%</text>
+</g>
+</svg>

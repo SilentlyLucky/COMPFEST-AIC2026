@@ -76,6 +76,27 @@ From the `backend` directory:
 
 ```sh
 export CORS_ALLOWED_ORIGINS="https://lapakin.example"
+./run.sh
+```
+
+`run.sh` uses `backend/.venv/bin/python` by default, validates the deployment
+artifacts, and starts one Uvicorn worker. Override the bind address or port when
+needed:
+
+```sh
+HOST=127.0.0.1 PORT=8000 ./run.sh
+RELOAD=1 HOST=127.0.0.1 ./run.sh   # local development only
+```
+
+Set `PYTHON_BIN` to use a different dedicated environment. The launcher does not
+fall back to the system or Conda Python automatically.
+
+If the pinned Hugging Face snapshot is stored in the project `.cache`, `run.sh`
+detects it automatically. When starting Uvicorn manually, export the same cache
+path first:
+
+```sh
+export HF_HOME="$(pwd)/../.cache/huggingface"
 python -m uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 

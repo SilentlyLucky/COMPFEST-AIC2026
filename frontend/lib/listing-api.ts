@@ -4,10 +4,9 @@ import type {
   ListingMetadata,
 } from "@/lib/listing-types";
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000").replace(
-  /\/$/,
-  "",
-);
+// Use Next's same-origin rewrite by default. Deployments with a separate public API
+// origin can still opt out explicitly.
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
 
 const FALLBACK_MESSAGES: Record<number, string> = {
   400: "Data permintaan belum bisa dibaca. Periksa kembali isianmu.",
@@ -52,6 +51,18 @@ function isErrorPayload(payload: unknown): payload is ApiErrorPayload {
     typeof meta.request_id === "string" &&
     typeof meta.api_version === "string"
   );
+}
+
+function firstValidationMessage(error: ApiErrorPayload["error"]): string | null {
+  const details = error.details;
+  if (!isRecord(details) || !Array.isArray(details.errors)) return null;
+
+  const firstError = details.errors[0];
+  if (!isRecord(firstError) || typeof firstError.message !== "string") {
+    return null;
+  }
+  const message = firstError.message.trim();
+  return message || null;
 }
 
 function isSuccessPayload(payload: unknown): payload is GenerateListingResponse {
@@ -104,8 +115,12 @@ export async function generateListing(
   const payload = await readJson(response);
   if (!response.ok) {
     if (isErrorPayload(payload)) {
+      const detailedMessage = firstValidationMessage(payload.error);
       throw new ListingApiError(
-        payload.error.message || FALLBACK_MESSAGES[response.status] || "Layanan tidak dapat menyelesaikan permintaan.",
+        detailedMessage ||
+          payload.error.message ||
+          FALLBACK_MESSAGES[response.status] ||
+          "Layanan tidak dapat menyelesaikan permintaan.",
         response.status,
         payload.error.code,
         payload.error.field,

@@ -3,9 +3,10 @@
 import { useRef, type ReactNode } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
+import { MotionPathPlugin } from "gsap/MotionPathPlugin";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
-gsap.registerPlugin(useGSAP, ScrollTrigger);
+gsap.registerPlugin(useGSAP, MotionPathPlugin, ScrollTrigger);
 
 export function LandingMotion({ children }: { children: ReactNode }) {
   const root = useRef<HTMLDivElement>(null);
@@ -13,18 +14,6 @@ export function LandingMotion({ children }: { children: ReactNode }) {
     () => {
       const media = gsap.matchMedia();
       media.add("(prefers-reduced-motion: no-preference)", () => {
-        gsap.utils.toArray<HTMLElement>("[data-price-reveal]").forEach((item) =>
-          gsap.from(item, {
-            y: 18,
-            ease: "none",
-            scrollTrigger: {
-              trigger: item,
-              start: "top 86%",
-              end: "top 56%",
-              scrub: 0.45,
-            },
-          }),
-        );
         gsap.utils.toArray<HTMLElement>("[data-stack-card]").forEach((card) =>
           gsap.from(card, {
             y: 28,
@@ -38,6 +27,35 @@ export function LandingMotion({ children }: { children: ReactNode }) {
             },
           }),
         );
+        gsap.utils.toArray<HTMLElement>("[data-process-copy]").forEach((copy) =>
+          gsap.from(copy, {
+            y: 18,
+            opacity: 0.84,
+            ease: "none",
+            scrollTrigger: {
+              trigger: copy,
+              start: "top 88%",
+              end: "top 58%",
+              scrub: 0.4,
+            },
+          }),
+        );
+        gsap.utils
+          .toArray<HTMLElement>("[data-process-image]")
+          .forEach((image) =>
+            gsap.from(image, {
+              y: 20,
+              opacity: 0.86,
+              scale: 0.99,
+              ease: "none",
+              scrollTrigger: {
+                trigger: image,
+                start: "top 88%",
+                end: "top 58%",
+                scrub: 0.45,
+              },
+            }),
+          );
         gsap.utils.toArray<SVGPathElement>("[data-draw-line]").forEach((line) =>
           gsap.from(line, {
             strokeDashoffset: 1,
@@ -50,27 +68,40 @@ export function LandingMotion({ children }: { children: ReactNode }) {
             },
           }),
         );
-        gsap.utils
-          .toArray<SVGCircleElement>("[data-marker-travel]")
-          .forEach((marker) =>
-            gsap.from(marker, {
-              x: -22,
-              opacity: 0.2,
-              scrollTrigger: {
-                trigger: marker,
-                start: "top 88%",
-                end: "top 62%",
-                scrub: 0.4,
-              },
-            }),
-          );
+        const problemSection = root.current?.querySelector<HTMLElement>("#masalah");
+        const problemPath = problemSection?.querySelector<SVGPathElement>(
+          "[data-problem-path]",
+        );
+        const problemMarker = problemSection?.querySelector<SVGCircleElement>(
+          "[data-problem-marker]",
+        );
+
+        if (problemSection && problemPath && problemMarker) {
+          gsap.to(problemMarker, {
+            motionPath: {
+              path: problemPath,
+              align: problemPath,
+              alignOrigin: [0.5, 0.5],
+              start: 0,
+              end: 1,
+            },
+            ease: "none",
+            scrollTrigger: {
+              trigger: problemSection,
+              start: "top bottom",
+              end: "bottom top",
+              scrub: true,
+              invalidateOnRefresh: true,
+            },
+          });
+        }
       });
       return () => media.revert();
     },
     { scope: root },
   );
   return (
-    <div ref={root} className="w-full max-w-full overflow-x-clip">
+    <div ref={root} className="w-full max-w-full">
       {children}
     </div>
   );

@@ -63,6 +63,8 @@ function jsonResponse(payload: unknown, status = 200): Response {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+  vi.resetModules();
 });
 
 describe("listing API contract", () => {
@@ -82,6 +84,28 @@ describe("listing API contract", () => {
     expect((body as FormData).get("metadata")).toBe(JSON.stringify(metadata));
     expect(result.meta.request_id).toBe("req_success");
     expect(result.data.listing.category.code).toBe("camilan_olahan");
+  });
+
+  it("uses the same-origin API path when no public API override is configured", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "");
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(successPayload));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { generateListing: generateListingWithDefaultBase } = await import("../lib/listing-api");
+    await generateListingWithDefaultBase(image, metadata, new AbortController().signal);
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/v1/listings/generate");
+  });
+
+  it("uses the explicit public API override when configured", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.example.test/");
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(successPayload));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { generateListing: generateListingWithOverride } = await import("../lib/listing-api");
+    await generateListingWithOverride(image, metadata, new AbortController().signal);
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.example.test/v1/listings/generate");
   });
 
   it("preserves a supplied optional product-type hint in multipart metadata", async () => {
@@ -121,6 +145,63 @@ describe("listing API contract", () => {
       requestId: "req_invalid",
       retryable: false,
       message: "Biaya produksi tidak valid.",
+    });
+  });
+
+  it("prefers a safe nested validation message so pricing tax hints reach the wizard", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse(
+        {
+          data: null,
+          meta: { request_id: "req_pricing_invalid", api_version: "v1" },
+          error: {
+            code: "METADATA_INVALID",
+            message: "Satu atau lebih field metadata tidak valid.",
+            field: "pricing",
+            retryable: false,
+            details: {
+              errors: [
+                {
+                  field: "pricing",
+                  message: "PPN dan omzet tahunan membuat potongan efektif terlalu tinggi.",
+                  type: "value_error",
+                },
+              ],
+            },
+          },
+        },
+        422,
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(generateListing(image, metadata, new AbortController().signal)).rejects.toMatchObject({
+      field: "pricing",
+      message: "PPN dan omzet tahunan membuat potongan efektif terlalu tinggi.",
+    });
+  });
+
+  it("falls back to the top-level message when nested validation details are malformed", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse(
+        {
+          data: null,
+          meta: { request_id: "req_malformed_details", api_version: "v1" },
+          error: {
+            code: "METADATA_INVALID",
+            message: "Metadata tidak valid.",
+            field: "pricing",
+            retryable: false,
+            details: { errors: [{ message: { leaked: "no" } }] },
+          },
+        },
+        422,
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(generateListing(image, metadata, new AbortController().signal)).rejects.toMatchObject({
+      message: "Metadata tidak valid.",
     });
   });
 

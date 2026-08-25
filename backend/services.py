@@ -48,7 +48,11 @@ class MarketPricingService(Protocol):
     def readiness(self) -> ServiceReadiness: ...
 
     async def find_comparables(
-        self, metadata: ListingMetadata, category: CategoryCode
+        self,
+        metadata: ListingMetadata,
+        category: CategoryCode,
+        *,
+        visual_query: str | None = None,
     ) -> MarketEvidence | None: ...
 
 
@@ -106,8 +110,13 @@ class UnavailableMarketPricingService:
         )
 
     async def find_comparables(
-        self, metadata: ListingMetadata, category: CategoryCode
+        self,
+        metadata: ListingMetadata,
+        category: CategoryCode,
+        *,
+        visual_query: str | None = None,
     ) -> MarketEvidence | None:
+        del visual_query
         raise _unavailable_error("market pricing service")
 
 

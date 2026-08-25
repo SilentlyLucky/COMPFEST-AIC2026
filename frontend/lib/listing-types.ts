@@ -25,6 +25,23 @@ export const CATEGORY_LABELS: Record<CategoryCode, string> = {
 export type PriceAlignment =
   "within_market" | "above_market" | "insufficient_evidence";
 
+export interface PricingOptions {
+  total_hpp_idr?: number;
+  purchase_unit?: string;
+  purchase_quantity?: number;
+  sale_content?: number;
+  sale_unit?: string;
+  output_unit_count?: number;
+  output_unit_label?: string;
+  colors?: string[];
+  sizes?: string[];
+  hpp_per_size_idr?: Record<string, number>;
+  grades?: string[];
+  hpp_per_grade_idr?: Record<string, number>;
+  annual_turnover_idr?: number;
+  vat_registered?: boolean;
+}
+
 export interface ListingMetadata {
   product_type?: string | null;
   platform: Platform;
@@ -38,12 +55,48 @@ export interface ListingMetadata {
   other_cost_idr: number;
   target_margin_pct: number;
   platform_fee_pct: number;
+  pricing?: PricingOptions;
 }
 
 export interface MarketInterval {
   low: number;
   high: number;
   target_coverage: number;
+}
+
+export interface MarketComparable {
+  title: string;
+  price: number;
+}
+
+export type PricingZone = "good" | "fair" | "tight" | "danger";
+
+export interface VariantPriceDetails {
+  label: string;
+  kind: "color" | "size" | "grade";
+  hpp_per_unit_idr: number;
+  minimum_price_idr: number;
+  recommended_price_idr: number;
+  aggressive_price_idr: number;
+  premium_price_idr: number;
+  margin_pct: number;
+  cost_breakdown_idr: Record<string, number>;
+  note: string;
+}
+
+export interface PricingDetails {
+  hpp_per_unit_idr: number;
+  sale_unit: string;
+  aggressive_price_idr: number;
+  premium_price_idr: number;
+  minimum_price_idr: number;
+  zone: PricingZone;
+  margin_pct: number;
+  cost_breakdown_idr: Record<string, number>;
+  variant_prices: VariantPriceDetails[];
+  suggested_variations: string[];
+  explanation: string;
+  engine_version: string;
 }
 
 export interface ConfidenceField {
@@ -82,6 +135,8 @@ export interface GenerateListingResponse {
         alignment: PriceAlignment;
         comparable_count: number;
         data_as_of: string | null;
+        comparable_preview?: MarketComparable[];
+        pricing_details?: PricingDetails;
       };
     };
     confidence: {

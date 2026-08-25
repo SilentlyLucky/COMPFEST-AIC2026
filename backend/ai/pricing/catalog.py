@@ -10,28 +10,35 @@ import math
 import re
 import threading
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Final
 
 try:
+    from ai.pricing.market_first import ENGINE_VERSION, price_with_market_first
     from errors import ApiError
     from schemas import (
         CategoryCode,
         CategoryPrediction,
         ListingMetadata,
+        MarketComparable,
         MarketEvidence,
+        PriceDecision,
         ProcessedImage,
         ServiceReadiness,
     )
 except ModuleNotFoundError:  # Allow importing as backend.ai.pricing from repo root.
+    from backend.ai.pricing.market_first import ENGINE_VERSION, price_with_market_first
     from backend.errors import ApiError
     from backend.schemas import (
         CategoryCode,
         CategoryPrediction,
         ListingMetadata,
+        MarketComparable,
         MarketEvidence,
+        PriceDecision,
         ProcessedImage,
         ServiceReadiness,
     )
@@ -49,6 +56,28 @@ STOP_WORDS: Final[frozenset[str]] = frozenset(
 )
 TOKEN_PATTERN: Final[re.Pattern[str]] = re.compile(r"[a-z0-9]+")
 MIN_EVIDENCE_COUNT = 15
+MAX_COMPARABLE_PREVIEW = 8
+MAX_COMPARABLE_TITLE_LENGTH = 160
+PRODUCT_FAMILY_TOKENS: Final[dict[str, frozenset[str]]] = {
+    "tas_tote": frozenset({"tote", "totebag"}),
+}
+EXPLICIT_ATTRIBUTE_TOKENS: Final[dict[str, frozenset[str]]] = {
+    "batik": frozenset({"batik"}),
+}
+INCOMPATIBLE_FASHION_TOKENS: Final[frozenset[str]] = frozenset(
+    {
+        "dress",
+        "blouse",
+        "kemeja",
+        "shirt",
+        "jaket",
+        "jacket",
+        "bomber",
+        "gamis",
+        "rok",
+        "celana",
+    }
+)
 
 
 class _CatalogError(Exception):
@@ -131,6 +160,30 @@ class _TfIdfIndex:
         ranked = sorted(scores.items(), key=lambda item: (-item[1], item[0]))[:limit]
         return [(self._rows[index], score) for index, score in ranked]
 
+    def category_rows(self, category: CategoryCode, limit: int) -> list[tuple[_Row, float]]:
+        """Return bounded catalog-order rows when text retrieval has no evidence."""
+        return [
+            (row, 0.0)
+            for row in self._rows
+            if row.category == category.value
+        ][:limit]
+
+    def constrained_rows(
+        self,
+        category: CategoryCode,
+        family: str | None,
+        required_attributes: frozenset[str],
+        limit: int,
+    ) -> list[tuple[_Row, float]]:
+        """Return catalog-order rows satisfying explicit product constraints."""
+        return [
+            (row, 0.0)
+            for row in self._rows
+            if row.category == category.value
+            and _matches_family(row, family)
+            and _matches_attributes(row, required_attributes)
+        ][:limit]
+
 
 def _quantile(values: list[int], probability: float) -> float:
     ordered = sorted(values)
@@ -153,6 +206,15 @@ def _robust_prices(values: list[int]) -> list[int]:
     return kept or ordered
 
 
+def _model_harga_quartile_prices(values: list[int]) -> list[int]:
+    """Match model_harga's inclusive 5th–95th percentile price filtering."""
+    ordered = sorted(values)
+    if len(ordered) < 4:
+        return ordered
+    p05, p95 = _quantile(ordered, 0.05), _quantile(ordered, 0.95)
+    return [price for price in ordered if p05 <= price <= p95]
+
+
 def _price(value: object) -> int | None:
     if value is None or isinstance(value, bool):
         return None
@@ -170,6 +232,7 @@ class CatalogPricingService:
     """Shared lazy catalog implementation of category and market protocols."""
 
     version = SERVICE_VERSION
+    pricing_version = ENGINE_VERSION
 
     def __init__(
         self,
@@ -268,48 +331,216 @@ class CatalogPricingService:
         )
 
     async def find_comparables(
-        self, metadata: ListingMetadata, category: CategoryCode
+        self,
+        metadata: ListingMetadata,
+        category: CategoryCode,
+        *,
+        visual_query: str | None = None,
     ) -> MarketEvidence | None:
         try:
-            neighbors = await asyncio.to_thread(self._retrieve, metadata)
+            evidence, _, _ = await asyncio.to_thread(
+                self._market_evidence_with_fallback,
+                metadata,
+                category,
+                visual_query,
+            )
         except ApiError:
             raise
         except Exception:  # noqa: BLE001 - hide artifact details at the API boundary.
             raise self._not_ready(category=False) from None
-        category_neighbors = [
-            (row, score) for row, score in neighbors if row.category == category.value
+        return evidence
+
+    async def price_market_first_from_catalog(
+        self,
+        metadata: ListingMetadata,
+        category: CategoryCode,
+        *,
+        visual_query: str | None = None,
+    ) -> PriceDecision:
+        """Retrieve once, then price with matching evidence and title signals."""
+        try:
+            evidence, category_neighbors, fallback_warnings = await asyncio.to_thread(
+                self._market_evidence_with_fallback,
+                metadata,
+                category,
+                visual_query,
+            )
+        except ApiError:
+            raise
+        except Exception:  # noqa: BLE001 - hide artifact details at the API boundary.
+            raise self._not_ready(category=False) from None
+        decision = self.price_market_first(
+            metadata,
+            category,
+            evidence,
+            comparable_titles=(row.title for row, _ in category_neighbors),
+        )
+        return decision.model_copy(
+            update={
+                "comparable_preview": _comparable_preview(category_neighbors),
+                "warnings": tuple(
+                    dict.fromkeys((*fallback_warnings, *decision.warnings))
+                )
+            }
+        )
+
+    def _market_evidence_with_fallback(
+        self,
+        metadata: ListingMetadata,
+        category: CategoryCode,
+        visual_query: str | None,
+    ) -> tuple[MarketEvidence | None, list[tuple[_Row, float]], tuple[str, ...]]:
+        """Prefer matching text evidence, with a safe lexical subtype gate."""
+        confirmed_facts = metadata.confirmed_facts()
+        family = _infer_product_family(confirmed_facts, visual_query)
+        required_attributes = _explicit_attributes(confirmed_facts)
+        primary_neighbors = self._category_neighbors(
+            self._retrieve(metadata),
+            category,
+            family=family,
+            required_attributes=required_attributes,
+        )
+        primary_evidence = self._market_evidence(primary_neighbors, category)
+        if self._has_enough_comparables(primary_evidence):
+            return primary_evidence, primary_neighbors, ()
+
+        warnings: list[str] = []
+        if visual_query and visual_query.strip():
+            warnings.append("MARKET_VISUAL_QUERY_FALLBACK")
+            visual_neighbors = self._category_neighbors(
+                self._retrieve_query(visual_query),
+                category,
+                family=family,
+                required_attributes=required_attributes,
+            )
+            visual_evidence = self._market_evidence(visual_neighbors, category)
+            if self._has_enough_comparables(visual_evidence):
+                return visual_evidence, visual_neighbors, tuple(warnings)
+
+        warnings.append("MARKET_CATEGORY_FALLBACK")
+        category_neighbors = (
+            self._constrained_rows(category, family, required_attributes)
+            if family is not None or required_attributes
+            else self._category_rows(category)
+        )
+        category_evidence = self._market_evidence(category_neighbors, category)
+        if not self._has_enough_comparables(category_evidence):
+            if family is not None:
+                warnings.append("MARKET_SUBTYPE_COMPARABLES_INSUFFICIENT")
+            if required_attributes:
+                warnings.append("MARKET_ATTRIBUTE_COMPARABLES_INSUFFICIENT")
+            if family is not None or required_attributes:
+                return category_evidence, category_neighbors, tuple(warnings)
+            return primary_evidence, primary_neighbors, tuple(warnings)
+        return (
+            category_evidence,
+            category_neighbors,
+            tuple(warnings),
+        )
+
+    @staticmethod
+    def _has_enough_comparables(evidence: MarketEvidence | None) -> bool:
+        return evidence is not None and evidence.comparable_count >= MIN_EVIDENCE_COUNT
+
+    @staticmethod
+    def _category_neighbors(
+        neighbors: Iterable[tuple[_Row, float]],
+        category: CategoryCode,
+        *,
+        family: str | None = None,
+        required_attributes: frozenset[str] = frozenset(),
+    ) -> list[tuple[_Row, float]]:
+        return [
+            (row, score)
+            for row, score in neighbors
+            if row.category == category.value
+            and _matches_family(row, family)
+            and _matches_attributes(row, required_attributes)
         ]
+
+    def _market_evidence(
+        self,
+        category_neighbors: list[tuple[_Row, float]],
+        category: CategoryCode,
+    ) -> MarketEvidence | None:
         if not category_neighbors or self._manifest is None:
             return None
-        prices = _robust_prices([row.price for row, _ in category_neighbors])
-        if not prices:
+        public_prices = _robust_prices([row.price for row, _ in category_neighbors])
+        quartile_prices = _model_harga_quartile_prices(
+            [row.price for row, _ in category_neighbors]
+        )
+        if not public_prices or not quartile_prices:
             return None
-        low = max(1, round(_quantile(prices, 0.10)))
-        median = max(1, round(_quantile(prices, 0.50)))
-        high = max(median, round(_quantile(prices, 0.90)))
+        low = max(1, round(_quantile(public_prices, 0.10)))
+        median = max(1, round(_quantile(public_prices, 0.50)))
+        high = max(median, round(_quantile(public_prices, 0.90)))
+        p25 = max(1, round(_quantile(quartile_prices, 0.25)))
+        p50 = max(1, round(_quantile(quartile_prices, 0.50)))
+        p75 = max(p50, round(_quantile(quartile_prices, 0.75)))
         return MarketEvidence(
             median=median,
             low=low,
             high=high,
-            comparable_count=len(prices),
+            p25=p25,
+            p50=p50,
+            p75=p75,
+            comparable_count=len(public_prices),
             data_as_of=self._manifest.data_as_of,
             confidence_score=(
                 self._calibration.price_score(category)
-                if self._calibration is not None and len(prices) >= MIN_EVIDENCE_COUNT
+                if self._calibration is not None
+                and len(public_prices) >= MIN_EVIDENCE_COUNT
                 else None
             ),
         )
 
+    def price_market_first(
+        self,
+        metadata: ListingMetadata,
+        category: CategoryCode,
+        evidence: MarketEvidence | None,
+        *,
+        comparable_titles: Iterable[str] = (),
+    ) -> PriceDecision:
+        """Apply the adapter to evidence and titles retrieved by the caller."""
+        return price_with_market_first(
+            metadata,
+            category,
+            evidence,
+            comparable_titles=comparable_titles,
+        )
+
     def _retrieve(self, metadata: ListingMetadata) -> list[tuple[_Row, float]]:
+        return self._retrieve_query(" ".join(metadata.confirmed_facts()))
+
+    def _retrieve_query(self, query: str) -> list[tuple[_Row, float]]:
         self._ensure_loaded()
         if self._index is None:  # pragma: no cover - guarded by _ensure_loaded.
             raise self._not_ready(category=False)
-        query = " ".join(metadata.confirmed_facts())
         return [
             item
             for item in self._index.search(query, self._retrieval_k)
             if item[1] >= self._min_score
         ]
+
+    def _category_rows(self, category: CategoryCode) -> list[tuple[_Row, float]]:
+        self._ensure_loaded()
+        if self._index is None:  # pragma: no cover - guarded by _ensure_loaded.
+            raise self._not_ready(category=False)
+        return self._index.category_rows(category, self._retrieval_k)
+
+    def _constrained_rows(
+        self,
+        category: CategoryCode,
+        family: str | None,
+        required_attributes: frozenset[str],
+    ) -> list[tuple[_Row, float]]:
+        self._ensure_loaded()
+        if self._index is None:  # pragma: no cover - guarded by _ensure_loaded.
+            raise self._not_ready(category=False)
+        return self._index.constrained_rows(
+            category, family, required_attributes, self._retrieval_k
+        )
 
     def _ensure_loaded(self) -> None:
         if self._index:
@@ -544,6 +775,70 @@ def _read_price_calibration(payload: object) -> dict[CategoryCode, int]:
     if total != expected_total:
         raise ValueError
     return scores
+
+
+def _infer_product_family(
+    confirmed_facts: Iterable[str], visual_query: str | None
+) -> str | None:
+    """Infer only a small family when a product fact or visual query is explicit."""
+    product_text = " ".join(confirmed_facts)
+    family = _family_from_text(product_text)
+    if family is not None:
+        return family
+    return _family_from_text(visual_query or "")
+
+
+def _family_from_text(text: str) -> str | None:
+    tokens = set(_tokens(text))
+    for family, family_tokens in PRODUCT_FAMILY_TOKENS.items():
+        if tokens.intersection(family_tokens):
+            return family
+    return None
+
+
+def _explicit_attributes(confirmed_facts: Iterable[str]) -> frozenset[str]:
+    tokens = set(_tokens(" ".join(confirmed_facts)))
+    return frozenset(
+        attribute
+        for attribute, attribute_tokens in EXPLICIT_ATTRIBUTE_TOKENS.items()
+        if tokens.intersection(attribute_tokens)
+    )
+
+
+def _matches_family(row: _Row, family: str | None) -> bool:
+    if family is None:
+        return True
+    tokens = set(_tokens(row.title))
+    return bool(tokens.intersection(PRODUCT_FAMILY_TOKENS[family])) and not bool(
+        tokens.intersection(INCOMPATIBLE_FASHION_TOKENS)
+    )
+
+
+def _matches_attributes(row: _Row, required_attributes: frozenset[str]) -> bool:
+    if not required_attributes:
+        return True
+    tokens = set(_tokens(row.title))
+    return all(
+        tokens.intersection(EXPLICIT_ATTRIBUTE_TOKENS[attribute])
+        for attribute in required_attributes
+    )
+
+
+def _comparable_preview(
+    neighbors: Iterable[tuple[_Row, float]],
+) -> tuple[MarketComparable, ...]:
+    """Expose a short, normalized source-order sample without retrieval scores."""
+    preview: list[MarketComparable] = []
+    for row, _ in neighbors:
+        title = "".join(
+            character for character in row.title if character.isprintable()
+        )
+        title = " ".join(title.split())[:MAX_COMPARABLE_TITLE_LENGTH].rstrip()
+        if title:
+            preview.append(MarketComparable(title=title, price=row.price))
+        if len(preview) == MAX_COMPARABLE_PREVIEW:
+            break
+    return tuple(preview)
 
 
 __all__ = ["CatalogPricingService"]
